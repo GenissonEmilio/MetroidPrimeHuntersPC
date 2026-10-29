@@ -13,14 +13,18 @@ namespace MphRead
         public bool StartGame { get; private set; }
         public bool Practice { get; private set; }
         private bool _capture;
+        private readonly string? _smokeOutput;
+        private int _smokeFrame;
 
-        public PcFrontEnd() : base(new GameWindowSettings { UpdateFrequency = 60 }, new NativeWindowSettings
+        public PcFrontEnd(string? smokeOutput = null) : base(new GameWindowSettings { UpdateFrequency = 60 }, new NativeWindowSettings
         {
             ClientSize = new Vector2i(1280, 720), Title = "Hunters PC - Menu",
-            Profile = ContextProfile.Compatability, Flags = ContextFlags.Default, APIVersion = new Version(3, 2)
+            Profile = ContextProfile.Compatability, Flags = ContextFlags.Default, APIVersion = new Version(3, 2),
+            StartVisible = smokeOutput == null
         })
         {
             VSync = VSyncMode.On;
+            _smokeOutput = smokeOutput;
             if (PcRuntime.Profile.Fullscreen) WindowState = WindowState.Fullscreen;
             _menu = new PcMenu(false, () => Start(false), Close, ToggleFullscreen, () => Start(true));
             _menu.Status = PcRom.Ready ? "ROM LOCAL VERIFICADA / TELA UNICA" : "ARRASTE SEU ZIP OU ROM .NDS PARA ESTA JANELA";
@@ -30,7 +34,7 @@ namespace MphRead
         {
             if (!PcRom.Ready)
             {
-                _menu.Status = "IMPORTE SUA ROM USA REV 0 ARRASTANDO O ARQUIVO AQUI";
+                _menu.Status = "IMPORTE SUA ROM USA REV 0 OU EUROPA REV 1 AQUI";
                 return;
             }
             Practice = practice; StartGame = true; Close();
@@ -46,6 +50,29 @@ namespace MphRead
         {
             GL.Clear(ClearBufferMask.ColorBufferBit);
             _menu.Draw(ClientSize);
+            if (_smokeOutput != null)
+            {
+                if (IsVisible || CursorState == CursorState.Grabbed)
+                    throw new InvalidOperationException("O teste deve manter a janela oculta e o cursor livre.");
+                if (_smokeFrame == 2)
+                {
+                    PcCapture.Save(ClientSize, _smokeOutput, "menu.png");
+                    _menu.Key(Keys.Down); _menu.Key(Keys.Down); _menu.Key(Keys.Enter);
+                    _menu.Key(Keys.Right);
+                }
+                if (_smokeFrame == 5)
+                {
+                    PcCapture.Save(ClientSize, _smokeOutput, "settings.png");
+                    _menu.Key(Keys.Escape);
+                    ClientSize = new Vector2i(1024, 768);
+                }
+                if (_smokeFrame == 8)
+                {
+                    PcCapture.Save(ClientSize, _smokeOutput, "menu-1024x768.png");
+                    Close();
+                }
+                _smokeFrame++;
+            }
             if (_capture)
             {
                 PcCapture.Save(ClientSize);

@@ -51,7 +51,7 @@ namespace MphRead
     {
         public static bool Enabled { get; set; }
         public static PcProfile Profile { get; set; } = new();
-        public static string StateRoot { get; set; } = AppContext.BaseDirectory;
+        public static string StateRoot { get; set; } = PcStorage.DataDirectory;
         public static string ProfilePath => Path.Combine(StateRoot, "pc-profile.json");
         internal static PcReplayInput? Replay { get; set; }
 

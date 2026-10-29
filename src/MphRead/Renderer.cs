@@ -1308,6 +1308,10 @@ namespace MphRead
 
         public bool OnRenderFrame()
         {
+            // Paused PC panels skip OnUpdateFrame. Restore scene state here too,
+            // before writing uniforms or redrawing the frozen scene.
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, _frameBuffer);
+            GL.UseProgram(_shaderProgramId);
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
             GL.ClearStencil(0);
 

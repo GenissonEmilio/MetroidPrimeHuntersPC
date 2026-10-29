@@ -17,6 +17,21 @@ Directory.CreateDirectory(folder);
 string path = Path.Combine(folder, "profile.json");
 try
 {
+    string homeDirectory = Path.Combine(folder, "home");
+    string xdgDirectory = Path.Combine(folder, "xdg-data");
+    string defaultDataDirectory = Path.Combine(homeDirectory, ".local", "share", "hunterspc");
+    Check(PcStorage.GetDataDirectory(true, folder, homeDirectory, null, null) == defaultDataDirectory,
+        "Linux defaults to user data storage outside the application");
+    Check(PcStorage.GetDataDirectory(true, folder, homeDirectory, xdgDirectory, null) == Path.Combine(xdgDirectory, "hunterspc"),
+        "Linux respects absolute XDG_DATA_HOME");
+    Check(PcStorage.GetDataDirectory(true, folder, homeDirectory, "relative", null) == defaultDataDirectory,
+        "Relative XDG_DATA_HOME falls back to the standard directory");
+    Check(PcStorage.GetDataDirectory(false, folder, folder, null, null) == folder,
+        "Windows retains portable application storage");
+    Check(PcStorage.GetDataDirectory(true, folder, homeDirectory, null, folder) == folder,
+        "Explicit data directory isolates test installations");
+    Check(Paths.Combine("models", @"sub\model.bin") == Path.Combine("models", "sub", "model.bin"),
+        "ROM asset paths use native separators");
     Check(PcProfile.Load(path).MouseSensitivity == 1, "Missing profile has usable defaults");
     File.WriteAllText(path, "{ broken");
     Check(PcProfile.Load(path).MouseSensitivity == 1, "Broken JSON does not block startup");
@@ -52,6 +67,11 @@ try
     rejected = false;
     try { PcRom.Validate(invalidRom); } catch (InvalidDataException) { rejected = true; }
     Check(rejected, "A forged game header is rejected by SHA-256");
+    "AMHP"u8.CopyTo(invalidRom.AsSpan(12));
+    invalidRom[30] = 1;
+    rejected = false;
+    try { PcRom.Validate(invalidRom); } catch (InvalidDataException) { rejected = true; }
+    Check(rejected, "A forged European revision is also rejected by SHA-256");
     var scans = new[]
     {
         new StringTableEntry("0000", '\0', "Equipment", "Known equipment description", 0, 'E'),

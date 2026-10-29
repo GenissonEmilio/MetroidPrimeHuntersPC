@@ -22,6 +22,15 @@ namespace MphRead
                 }
                 Paths.UpdatePaths();
                 Paths.ChooseMphPath();
+                if (OperatingSystem.IsLinux())
+                    OpenTK.Windowing.GraphicsLibraryFramework.GLFW.InitHint(
+                        OpenTK.Windowing.GraphicsLibraryFramework.InitHintPlatform.Platform,
+                        OpenTK.Windowing.GraphicsLibraryFramework.Platform.X11);
+                if (args.Length == 2 && args[0] == "--pc-smoke")
+                {
+                    PcSmokeCheck.Run(args[1]);
+                    return true;
+                }
                 if (args.Length == 2 && args[0] == "--pc-verify")
                 {
                     if (!PcRom.Ready) throw new InvalidDataException("Importe a ROM antes de verificar o jogo.");
@@ -36,7 +45,7 @@ namespace MphRead
                     return true;
                 }
                 if (args.Length != 0 && !args.SequenceEqual(new[] { "--pc" }))
-                    throw new ArgumentException("Use --pc, --pc-import <rom.nds ou zip>, --pc-room <id> ou --legacy.");
+                    throw new ArgumentException("Use --pc, --pc-import <rom.nds ou zip>, --pc-verify <pasta>, --pc-smoke <pasta>, --pc-room <id> ou --legacy.");
                 while (true)
                 {
                     bool start;

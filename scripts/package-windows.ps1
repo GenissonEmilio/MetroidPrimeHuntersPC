@@ -1,5 +1,5 @@
 param(
-    [string]$Version = 'v0.1.0-alpha.1',
+    [string]$Version = 'v0.2.0',
     [string]$DotnetPath = 'dotnet',
     [string]$PythonPath = 'python'
 )
@@ -19,14 +19,14 @@ Copy-Item -LiteralPath (Join-Path $projectRoot 'RELEASE_NOTES.md') -Destination 
 METROID PRIME HUNTERS PC - WINDOWS X64
 
 1. Extraia a pasta inteira e abra HuntersPC.exe.
-2. Arraste sua ROM USA revisao 0 (.nds ou ZIP com uma ROM) para o menu.
+2. Arraste sua ROM USA revisao 0 ou Europa revisao 1 (.nds ou ZIP com uma ROM) para o menu.
 3. Aguarde a importacao local e escolha TESTAR CONTROLES ou INICIAR / CONTINUAR.
 
 WASD: mover. Mouse: camera/mira. Clique: disparar. Espaco: pular/boost.
 C: alternar forma. E: visor. Q: scan/ataque alternativo. Roda/1-9: armas.
 M: mapa. J: diario. Tab: alternar paineis. Esc: voltar/pausa. F11: tela cheia.
 
-Esta alpha nao inclui ROM, BIOS, saves ou dados extraidos do jogo.
+Este pacote nao inclui ROM, BIOS, saves ou dados extraidos do jogo.
 O runtime .NET e as bibliotecas acompanham o pacote. Leia README-PC.md,
 RELEASE_NOTES.md e as licencas antes de usar ou redistribuir.
 '@, [Text.UTF8Encoding]::new($false))

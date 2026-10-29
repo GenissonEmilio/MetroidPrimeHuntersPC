@@ -11,17 +11,25 @@ namespace MphRead
     public static class PcRom
     {
         public const string UsaRev0Sha256 = "7d0a98ff98e1b7c985d1f3d89b01730af1b2115061a4dfea847612d217a8b855";
+        public const string EuropeRev1Sha256 = "faac3ac98be17375b90916a3c12b5a9b8c220165fbb485cf179033f90839f97e";
 
         public static string Validate(ReadOnlySpan<byte> data)
         {
-            if (data.Length != 64 * 1024 * 1024 || Encoding.ASCII.GetString(data.Slice(12, 4)) != "AMHE" || data[30] != 0)
+            if (data.Length != 64 * 1024 * 1024)
             {
-                throw new InvalidDataException("Esta versao requer Metroid Prime Hunters USA, revisao 0, 64 MiB.");
+                throw new InvalidDataException("Esta versao requer Metroid Prime Hunters USA revisao 0 ou Europa revisao 1, 64 MiB.");
             }
-            string hash = Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
-            if (hash != UsaRev0Sha256)
+            string code = Encoding.ASCII.GetString(data.Slice(12, 4));
+            string? expected = (code, data[30]) switch
             {
-                throw new InvalidDataException("A ROM nao corresponde a revisao USA 0 verificada. O arquivo original foi preservado.");
+                ("AMHE", 0) => UsaRev0Sha256,
+                ("AMHP", 1) => EuropeRev1Sha256,
+                _ => null
+            };
+            string hash = Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
+            if (hash != expected)
+            {
+                throw new InvalidDataException("A ROM nao corresponde a uma revisao verificada (USA 0 / Europa 1). O arquivo original foi preservado.");
             }
             return hash;
         }
@@ -56,12 +64,15 @@ namespace MphRead
                 if (Ready) return;
                 throw new InvalidDataException("Ja existe uma importacao incompleta nesta pasta. Use uma pasta nova para importar.");
             }
-            string temporary = Path.Combine(AppContext.BaseDirectory, ".import.nds");
+            string temporary = Path.Combine(PcRuntime.StateRoot, ".import.nds");
             try
             {
                 File.WriteAllBytes(temporary, data);
                 Extract.Setup(temporary);
-                File.WriteAllText("rom-import.json", JsonSerializer.Serialize(new { GameCode = "AMHE", Revision = 0, Sha256 = hash }));
+                File.WriteAllText("rom-import.json", JsonSerializer.Serialize(new
+                {
+                    GameCode = Encoding.ASCII.GetString(data, 12, 4), Revision = data[30], Sha256 = hash
+                }));
                 Paths.UpdatePaths();
                 Paths.ChooseMphPath();
             }

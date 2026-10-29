@@ -1,11 +1,13 @@
 # Hunters PC — primeira versão jogável
 
-Adaptação experimental de **MphRead**, de NoneGiven, para Windows x64. Inclui
+Adaptação experimental de **MphRead**, de NoneGiven, para Windows e Linux x64. Inclui
 menu gráfico, controles de FPS, configurações, mapa local, diário e pausa sobre a mesma tela.
 Não é uma campanha completamente validada. A implementação herdada e as
 alterações desta versão estão separadas em [Análise técnica](docs/ANALISE-PORT-PC.md).
 
-## Jogar
+Para instalação, dependências e dados no Linux, consulte [README-LINUX.md](README-LINUX.md).
+
+## Jogar no Windows
 
 Abra `HuntersPC.exe` na pasta extraída do pacote Windows. Se você compilou a
 versão local, o caminho padrão é `dist/HuntersPC/HuntersPC.exe`. Arraste sua ROM
@@ -22,7 +24,7 @@ Entre em **TESTAR CONTROLES** para a arena ou **INICIAR / CONTINUAR** para a ave
 O menu recebe cliques e teclado. Ajuste sensibilidade, inversão de Y, dicas,
 volumes e tela cheia em **CONFIGURACOES**. Salve a campanha pela nave antes de sair.
 
-Em uma cópia sem dados, arraste sua ROM USA revisão 0 `.nds` ou seu ZIP para
+Em uma cópia sem dados, arraste sua ROM USA revisão 0 ou Europa revisão 1 `.nds` ou seu ZIP para
 a janela do menu. Os dados são extraídos uma vez na pasta do executável.
 O mapa usa a geometria da ROM, marca sua posição e as portas da sala atual e
 permite consultar salas já visitadas. No mapa, WASD desloca a planta, roda/+/-
@@ -42,7 +44,7 @@ Remapeamento gráfico e validação completa da campanha ainda são trabalho fut
 
 ## Compilar
 
-Requer .NET SDK 9 ou compatível e acesso ao NuGet. O executável publicado é
+Requer .NET SDK 10 ou compatível e acesso ao NuGet. O executável publicado é
 autossuficiente, portanto quem joga não precisa instalar o .NET.
 
 ```powershell

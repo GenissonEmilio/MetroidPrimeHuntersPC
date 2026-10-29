@@ -12,7 +12,7 @@ namespace MphRead
     {
         public static string Save(Vector2i size, string? folder = null, string? name = null)
         {
-            folder ??= Path.Combine(AppContext.BaseDirectory, "evidence");
+            folder ??= Path.Combine(PcRuntime.StateRoot, "evidence");
             Directory.CreateDirectory(folder);
             byte[] pixels = new byte[checked(size.X * size.Y * 4)];
             GL.ReadPixels(0, 0, size.X, size.Y, OpenTK.Graphics.OpenGL.PixelFormat.Rgba, PixelType.UnsignedByte, pixels);

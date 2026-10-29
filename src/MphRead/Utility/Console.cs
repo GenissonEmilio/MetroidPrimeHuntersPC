@@ -22,7 +22,10 @@ namespace MphRead
         public static void Run()
         {
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-            Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
+            string dataDirectory = PcStorage.DataDirectory;
+            Directory.CreateDirectory(dataDirectory);
+            PcRuntime.StateRoot = dataDirectory;
+            Directory.SetCurrentDirectory(dataDirectory);
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 IntPtr iStdOut = GetStdHandle(-11);

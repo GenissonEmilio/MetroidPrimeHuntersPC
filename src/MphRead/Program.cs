@@ -15,6 +15,9 @@ namespace MphRead
 
         private static void Main(string[] args)
         {
+            // ConsoleSetup changes directory; resolve user-supplied CLI paths first.
+            if (args.Length == 2 && args[0] is "--pc-import" or "--pc-verify" or "--pc-smoke")
+                args[1] = Path.GetFullPath(args[1]);
             ConsoleSetup.Run();
             if (PcBootstrap.TryRun(args))
             {

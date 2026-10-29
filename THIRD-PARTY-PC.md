@@ -11,7 +11,7 @@
   https://github.com/CommunityToolkit/dotnet
 - **SoundFlow 1.4.1**, MIT, e suas bibliotecas nativas conforme o pacote.
   https://github.com/LSXPrime/SoundFlow
-- **System.IO.Hashing / .NET**, MIT.
+- **System.IO.Hashing / .NET 10**, MIT.
   https://github.com/dotnet/runtime
 - **OpenAL Soft 1.25.2**, LGPL-2.0-or-later, biblioteca dinâmica opcional e substituível.
   Fonte correspondente: https://github.com/kcat/openal-soft/tree/1.25.2
@@ -23,3 +23,7 @@ Os créditos de formatos, áudio e vídeo herdados de MphRead estão em `README-
 Os três projetos fornecidos como referência de arquitetura não foram copiados.
 Código de interface, alfabeto bitmap e desenho do menu desta adaptação foram
 criados nesta sessão. Os dados Nintendo são importados da ROM local do usuário.
+
+No Linux, GLFW e MiniAudio acompanham o pacote NuGet; OpenAL Soft é uma
+dependência dinâmica do sistema e não é redistribuída no tarball Linux.
+O ícone SVG é desenhado em código para esta adaptação, sem arte extraída da ROM.

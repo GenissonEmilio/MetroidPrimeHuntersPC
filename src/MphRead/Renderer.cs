@@ -4243,6 +4243,7 @@ namespace MphRead
 
         private void OnKeyHeld()
         {
+            if (PcRuntime.Replay != null) return;
             if (_keyboardState.IsKeyDown(Keys.LeftAlt) || _keyboardState.IsKeyDown(Keys.RightAlt))
             {
                 Selection.OnKeyHeld(_keyboardState);
@@ -4883,9 +4884,27 @@ namespace MphRead
 
         public Scene Scene { get; }
         private bool _startedHidden = true;
+        private PcMenu? _pcMenu;
+        private bool _pcMenuOpen;
+        private bool _pcResync = true;
+        private bool _pcResumeMusic;
+        private bool _pcCapture;
+        internal PcFieldView PcView { get; private set; }
+        private PcFieldView _pcArchiveParent;
+        internal PcMap? PcMap { get; private set; }
+        internal PcJournal? PcJournal { get; private set; }
 
         public RenderWindow() : base(_gameWindowSettings, _nativeWindowSettings)
         {
+            if (PcRuntime.Enabled)
+            {
+                ClientSize = new Vector2i(1280, 720);
+                VSync = PcVerification.Active ? VSyncMode.Off : VSyncMode.On;
+                if (PcVerification.Active) UpdateFrequency = 0;
+                if (PcRuntime.Profile.Fullscreen && !PcVerification.Active) WindowState = WindowState.Fullscreen;
+                _pcMenu = new PcMenu(true, () => SetPcPause(false), Close, TogglePcFullscreen,
+                    map: () => OpenPcArchive(PcFieldView.Map), journal: () => OpenPcArchive(PcFieldView.Journal));
+            }
             Scene = new Scene(Size, KeyboardState, MouseState, (string title) =>
             {
                 Title = title;
@@ -4943,28 +4962,44 @@ namespace MphRead
 
         protected override void OnRenderFrame(FrameEventArgs args)
         {
-            CursorState = Scene.CameraMode == CameraMode.Player && !Scene.FrameAdvance && !Scene.ShowCursor && !GameState.DialogPause
+            PcVerification.BeforeFrame(this);
+            CursorState = !PcVerification.Active && IsFocused && !_pcMenuOpen && Scene.CameraMode == CameraMode.Player && !Scene.FrameAdvance && !Scene.ShowCursor && !GameState.DialogPause
                 ? CursorState.Grabbed
                 : CursorState.Normal;
             GameState.ApplyPause();
-            Scene.OnUpdateFrame();
+            if (PcRuntime.Enabled && _pcResync && !_pcMenuOpen)
+            {
+                PlayerEntity.ResyncPcInput(KeyboardState, MouseState);
+                _pcResync = false;
+            }
+            if (!_pcMenuOpen) Scene.OnUpdateFrame();
             if (!Scene.OnRenderFrame())
             {
                 return;
             }
+            if (PcView == PcFieldView.Map) PcMap?.Draw(ClientSize);
+            else if (PcView == PcFieldView.Journal) PcJournal?.Draw(ClientSize);
+            else if (_pcMenuOpen) _pcMenu?.Draw(ClientSize);
+            else if (PcRuntime.Enabled && PcRuntime.Profile.ShowHints && !GameState.DialogPause && !Scene.MoviePlaying)
+            {
+                PcHud.Draw(ClientSize);
+            }
+            if (_pcCapture) { PcCapture.Save(ClientSize); _pcCapture = false; }
+            PcVerification.AfterFrame(this);
             SwapBuffers();
             if (_startedHidden)
             {
-                IsVisible = true;
+                if (!PcVerification.Active) IsVisible = true;
                 _startedHidden = false;
             }
-            Scene.AfterRenderFrame();
+            if (!_pcMenuOpen) Scene.AfterRenderFrame();
             base.OnRenderFrame(args);
         }
 
         protected override void OnResize(ResizeEventArgs e)
         {
             GL.Viewport(0, 0, e.Size.X, e.Size.Y);
+            if (Scene == null || e.Size.X <= 0 || e.Size.Y <= 0) return;
             Scene.Size = e.Size;
             Scene.OnResize();
             base.OnResize(e);
@@ -4972,6 +5007,11 @@ namespace MphRead
 
         protected override void OnMouseDown(MouseButtonEventArgs e)
         {
+            if (_pcMenuOpen)
+            {
+                if (e.Button == MouseButton.Left) HandlePcPointer(MouseState.Position, true);
+                return;
+            }
             if (e.Button == MouseButton.Button1)
             {
                 Scene.OnMouseClick(down: true);
@@ -4981,6 +5021,7 @@ namespace MphRead
 
         protected override void OnMouseUp(MouseButtonEventArgs e)
         {
+            if (_pcMenuOpen) return;
             if (e.Button == MouseButton.Button1)
             {
                 Scene.OnMouseClick(down: false);
@@ -4990,18 +5031,34 @@ namespace MphRead
 
         protected override void OnMouseMove(MouseMoveEventArgs e)
         {
+            if (_pcMenuOpen)
+            {
+                HandlePcPointer(MouseState.Position, false);
+                return;
+            }
             Scene.OnMouseMove(e.DeltaX, e.DeltaY);
             base.OnMouseMove(e);
         }
 
         protected override void OnMouseWheel(MouseWheelEventArgs e)
         {
+            if (_pcMenuOpen) { HandlePcPointer(MouseState.Position, false, e.OffsetY); return; }
             Scene.OnMouseWheel(e.OffsetY);
             base.OnMouseWheel(e);
         }
 
         protected override void OnKeyDown(KeyboardKeyEventArgs e)
         {
+            if (PcRuntime.Enabled)
+            {
+                if (e.IsRepeat && (PcView is not (PcFieldView.Map or PcFieldView.Journal)
+                    || e.Key is Keys.M or Keys.J or Keys.Tab or Keys.Escape or Keys.Backspace or Keys.F11 or Keys.F12)) return;
+                if (e.Key == Keys.F11 || e.Key == Keys.Enter && e.Alt) { TogglePcFullscreen(); return; }
+                HandlePcKey(e.Key);
+                // The native gameplay layer reads the configured keys. Keep the viewer's
+                // developer shortcuts out of the PC play mode.
+                return;
+            }
             if (e.Key == Keys.Escape)
             {
                 Scene.DoCleanup();
@@ -5016,6 +5073,85 @@ namespace MphRead
                 Scene.OnKeyDown(e);
             }
             base.OnKeyDown(e);
+        }
+
+        protected override void OnFocusedChanged(FocusedChangedEventArgs e)
+        {
+            if (PcRuntime.Enabled && !PcVerification.Active && !e.IsFocused && !_startedHidden && !_pcMenuOpen) SetPcPause(true);
+            base.OnFocusedChanged(e);
+        }
+
+        private void TogglePcFullscreen()
+        {
+            PcRuntime.Profile.Fullscreen = WindowState != WindowState.Fullscreen;
+            WindowState = PcRuntime.Profile.Fullscreen ? WindowState.Fullscreen : WindowState.Normal;
+            PcRuntime.Profile.Save(PcRuntime.ProfilePath);
+        }
+
+        private void SetPcPause(bool paused)
+        {
+            SetPcView(paused ? PcFieldView.Pause : PcFieldView.None);
+        }
+
+        internal void HandlePcKey(Keys key)
+        {
+            if (key == Keys.F12) { _pcCapture = true; return; }
+            if (key == Keys.M) { if (PcView == PcFieldView.Map) ClosePcArchive(); else OpenPcArchive(PcFieldView.Map); return; }
+            if (key == Keys.J) { if (PcView == PcFieldView.Journal) ClosePcArchive(); else OpenPcArchive(PcFieldView.Journal); return; }
+            if (key == Keys.Tab && PcView is PcFieldView.Map or PcFieldView.Journal)
+            { OpenPcArchive(PcView == PcFieldView.Map ? PcFieldView.Journal : PcFieldView.Map); return; }
+            if (key is Keys.Escape or Keys.Backspace)
+            {
+                if (PcView is PcFieldView.Map or PcFieldView.Journal) ClosePcArchive();
+                else if (_pcMenuOpen) _pcMenu?.Key(key);
+                else SetPcPause(true);
+                return;
+            }
+            if (PcView == PcFieldView.Map) PcMap?.Key(key);
+            else if (PcView == PcFieldView.Journal) PcJournal?.Key(key);
+            else if (_pcMenuOpen) _pcMenu?.Key(key);
+        }
+
+        internal void HandlePcPointer(Vector2 pointer, bool click, float wheel = 0)
+        {
+            Vector2 point = PcLayout.ToCanvas(pointer, ClientSize);
+            if (click && PcView is PcFieldView.Map or PcFieldView.Journal
+                && point.X is >= 1050 and < 1208 && point.Y is >= 36 and < 70)
+            {
+                ClosePcArchive();
+                return;
+            }
+            if (PcView == PcFieldView.Map) PcMap?.Pointer(point, click, wheel);
+            else if (PcView == PcFieldView.Journal) PcJournal?.Pointer(point, click, wheel);
+            else if (_pcMenuOpen) _pcMenu?.Pointer(pointer, ClientSize, click);
+        }
+
+        private void OpenPcArchive(PcFieldView view)
+        {
+            if (Scene.MoviePlaying || GameState.DialogPause || GameState.InRoomTransition) return;
+            if (PcView is not (PcFieldView.Map or PcFieldView.Journal)) _pcArchiveParent = PcView;
+            if (view == PcFieldView.Map) PcMap = new PcMap(Scene);
+            else PcJournal = new PcJournal(GameState.StorySave);
+            SetPcView(view);
+        }
+
+        private void ClosePcArchive() => SetPcView(_pcArchiveParent);
+
+        private void SetPcView(PcFieldView view)
+        {
+            bool paused = view != PcFieldView.None;
+            bool wasPaused = _pcMenuOpen;
+            PcView = view;
+            _pcMenuOpen = paused;
+            if (wasPaused == paused) return;
+            _pcResync = true;
+            if (paused)
+            {
+                _pcResumeMusic = !Music.IsPaused;
+                Music.Pause();
+                PlayerEntity.Main.Controls.ClearAll();
+            }
+            else if (_pcResumeMusic) Music.PlayPausedMusic();
         }
     }
 

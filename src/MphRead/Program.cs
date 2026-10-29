@@ -16,6 +16,14 @@ namespace MphRead
         private static void Main(string[] args)
         {
             ConsoleSetup.Run();
+            if (PcBootstrap.TryRun(args))
+            {
+                return;
+            }
+            if (args.Length == 1 && args[0] == "--legacy")
+            {
+                args = Array.Empty<string>();
+            }
             if (CheckSetup(args))
             {
                 return;

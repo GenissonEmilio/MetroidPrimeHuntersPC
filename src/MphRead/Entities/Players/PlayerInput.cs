@@ -477,8 +477,9 @@ namespace MphRead.Entities
                 }
                 if (Controls.MouseAim && !Flags1.TestFlag(PlayerFlags1.NoAimInput) && !IsBot)
                 {
-                    float aimY = -Input.MouseDeltaY / 4f; // itodo: x and y sensitivity
-                    float aimX = -Input.MouseDeltaX / 4f;
+                    float sensitivity = PcRuntime.Enabled ? PcRuntime.Profile.MouseSensitivity : 1;
+                    float aimY = -Input.MouseDeltaY / 4f * sensitivity;
+                    float aimX = -Input.MouseDeltaX / 4f * sensitivity;
                     if (CameraSequence.Current?.Flags.TestFlag(CamSeqFlags.BlockInput) == true
                         || _scene.FrameAdvance || _scene.FrameAdvanceLastFrame) // skdebug
                     {
@@ -1224,8 +1225,9 @@ namespace MphRead.Entities
                     // Trace, Sylux, Weavel
                     if (Controls.MouseAim && !Flags1.TestFlag(PlayerFlags1.NoAimInput) && !IsBot)
                     {
-                        float aimY = -Input.MouseDeltaY / 4f; // itodo: x and y sensitivity
-                        float aimX = -Input.MouseDeltaX / 4f;
+                        float sensitivity = PcRuntime.Enabled ? PcRuntime.Profile.MouseSensitivity : 1;
+                        float aimY = -Input.MouseDeltaY / 4f * sensitivity;
+                        float aimX = -Input.MouseDeltaX / 4f * sensitivity;
                         if (CameraSequence.Current?.Flags.TestFlag(CamSeqFlags.BlockInput) == true
                             || _scene.FrameAdvance || _scene.FrameAdvanceLastFrame) // skdebug
                         {
@@ -2074,10 +2076,29 @@ namespace MphRead.Entities
             }
         }
 
+        public static void ResyncPcInput(KeyboardState keyboardState, MouseState mouseState)
+        {
+            foreach (PlayerEntity player in Players)
+            {
+                if (player.IsBot) continue;
+                player.Input.KeyboardState = player.Input.PrevKeyboardState = keyboardState.GetSnapshot();
+                player.Input.MouseState = player.Input.PrevMouseState = mouseState.GetSnapshot();
+                player.Input.IgnoreMouseFrames = 2;
+                player.Input.ClickX = player.Input.ClickY = -1;
+                player.Controls.ClearAll();
+                foreach (Keybind control in player.Controls.All) control.NeedsRepress = true;
+            }
+        }
+
         public static void ProcessInput(KeyboardState keyboardState, MouseState mouseState, bool noPlayerInput)
         {
             KeyboardState keyboardSnap = keyboardState.GetSnapshot();
             MouseState mouseSnap = mouseState.GetSnapshot();
+            PcReplayInput? replay = PcRuntime.Replay;
+            bool KeyDown(Keys key) => replay?.KeyDown(key) ?? keyboardSnap.IsKeyDown(key);
+            bool KeyWasDown(Keys key, KeyboardState? previous) => replay?.KeyWasDown(key) ?? previous?.IsKeyDown(key) ?? false;
+            bool MouseDown(MouseButton button) => replay?.MouseDown(button) ?? mouseSnap.IsButtonDown(button);
+            bool MouseWasDown(MouseButton button, MouseState? previous) => replay?.MouseWasDown(button) ?? previous?.IsButtonDown(button) ?? false;
             for (int i = 0; i < Players.Count; i++)
             {
                 PlayerEntity player = Players[i];
@@ -2096,6 +2117,12 @@ namespace MphRead.Entities
                 player.Input.HasInput = false;
                 KeyboardState? prevKeyboardSnap = player.Input.KeyboardState;
                 MouseState? prevMouseSnap = player.Input.MouseState;
+                player.Input.SuppressMouseDelta = player.Input.IgnoreMouseFrames > 0;
+                if (player.Input.IgnoreMouseFrames > 0)
+                {
+                    prevMouseSnap = mouseSnap;
+                    player.Input.IgnoreMouseFrames--;
+                }
                 player.Input.PrevKeyboardState = prevKeyboardSnap;
                 player.Input.PrevMouseState = prevMouseSnap;
                 player.Input.KeyboardState = keyboardSnap;
@@ -2109,8 +2136,13 @@ namespace MphRead.Entities
                         {
                             if (control.Key != Keys.Unknown)
                             {
-                                bool prevDown = prevKeyboardSnap?.IsKeyDown(control.Key) ?? false;
-                                control.IsDown = keyboardSnap.IsKeyDown(control.Key);
+                                bool prevDown = KeyWasDown(control.Key, prevKeyboardSnap);
+                                if (PcRuntime.Enabled && control.NeedsRepress)
+                                {
+                                    if (KeyDown(control.Key)) continue;
+                                    control.NeedsRepress = false;
+                                }
+                                control.IsDown = KeyDown(control.Key);
                                 control.IsPressed = control.IsDown && !prevDown;
                                 control.IsReleased = !control.IsDown && prevDown;
                                 if (control.IsDown || control.IsPressed || control.IsReleased)
@@ -2129,8 +2161,8 @@ namespace MphRead.Entities
                             {
                                 control.NeedsRepress = true;
                             }
-                            bool down = mouseSnap.IsButtonDown(control.MouseButton);
-                            bool prevDown = prevMouseSnap?.IsButtonDown(control.MouseButton) ?? false;
+                            bool down = MouseDown(control.MouseButton);
+                            bool prevDown = MouseWasDown(control.MouseButton, prevMouseSnap);
                             if (control.NeedsRepress && !player._ignoreClick)
                             {
                                 if (!down || !prevDown)
@@ -2152,8 +2184,8 @@ namespace MphRead.Entities
                         else
                         {
                             // todo?: deal with overflow or whatever
-                            float curScrollY = mouseSnap.Scroll.Y;
-                            float prevScrollY = prevMouseSnap?.Scroll.Y ?? 0;
+                            float curScrollY = replay == null ? mouseSnap.Scroll.Y : 0;
+                            float prevScrollY = replay == null ? prevMouseSnap?.Scroll.Y ?? 0 : 0;
                             control.IsDown = control.Type == ButtonType.ScrollUp && curScrollY > prevScrollY
                                 || control.Type == ButtonType.ScrollDown && curScrollY < prevScrollY;
                             control.IsPressed = control.IsDown;
@@ -2166,7 +2198,7 @@ namespace MphRead.Entities
                     }
                 }
                 player._ignoreClick = false;
-                if (mouseSnap.IsButtonDown(MouseButton.Left) && prevMouseSnap?.IsButtonDown(MouseButton.Left) != true)
+                if (MouseDown(MouseButton.Left) && !MouseWasDown(MouseButton.Left, prevMouseSnap))
                 {
                     player.Input.ClickX = mouseSnap.X;
                     player.Input.ClickY = mouseSnap.Y;
@@ -2187,16 +2219,16 @@ namespace MphRead.Entities
                     {
                         if (skipControl.Key != Keys.Unknown)
                         {
-                            bool prevDown = prevKeyboardSnap?.IsKeyDown(skipControl.Key) ?? false;
-                            bool isDown = keyboardSnap.IsKeyDown(skipControl.Key);
+                            bool prevDown = KeyWasDown(skipControl.Key, prevKeyboardSnap);
+                            bool isDown = KeyDown(skipControl.Key);
                             bool isPressed = isDown && !prevDown;
                             skipMovie = isPressed;
                         }
                     }
                     else if (skipControl.Type == ButtonType.Mouse)
                     {
-                        bool prevDown = prevMouseSnap?.IsButtonDown(skipControl.MouseButton) ?? false;
-                        bool isDown = mouseSnap.IsButtonDown(skipControl.MouseButton);
+                        bool prevDown = MouseWasDown(skipControl.MouseButton, prevMouseSnap);
+                        bool isDown = MouseDown(skipControl.MouseButton);
                         bool isPressed = isDown && !prevDown;
                         skipMovie = isPressed;
                     }
@@ -2227,12 +2259,14 @@ namespace MphRead.Entities
             public MouseState? PrevMouseState { get; set; }
             public MouseState? MouseState { get; set; }
 
-            public float MouseDeltaX => (MouseState?.X - PrevMouseState?.X) ?? 0;
-            public float MouseDeltaY => (MouseState?.Y - PrevMouseState?.Y) ?? 0;
+            public bool SuppressMouseDelta { get; set; }
+            public float MouseDeltaX => SuppressMouseDelta ? 0 : PcRuntime.Replay?.LookDelta.X ?? (MouseState?.X - PrevMouseState?.X) ?? 0;
+            public float MouseDeltaY => SuppressMouseDelta ? 0 : PcRuntime.Replay?.LookDelta.Y ?? (MouseState?.Y - PrevMouseState?.Y) ?? 0;
             public float ClickX { get; set; } = -1;
             public float ClickY { get; set; } = -1;
 
             public bool HasInput { get; set; }
+            public int IgnoreMouseFrames { get; set; }
         }
     }
 
@@ -2336,9 +2370,9 @@ namespace MphRead.Entities
         public Keybind AffinitySlot { get; }
         public Keybind Pause { get; }
 
-        public bool InvertAimY { get; }
+        public bool InvertAimY { get; set; }
         public bool InvertAimX { get; }
-        public bool ScrollAllWeapons { get; }
+        public bool ScrollAllWeapons { get; set; }
 
         public Keybind[] All { get; }
 

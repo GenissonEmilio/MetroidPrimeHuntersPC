@@ -1,52 +1,71 @@
-# MphRead
-This project is a reverse engineering and game recreation effort comprising a model viewer, scene renderer, and general parser for file formats used in the Nintendo DS game Metroid Prime Hunters. The renderer is implemented using OpenGL via the [OpenTK](https://github.com/opentk/opentk) library with audio through [OpenAL Soft](https://github.com/kcat/openal-soft) and [SoundFlow](https://github.com/LSXPrime/SoundFlow). Documentation of various game features can be found in the [wiki](https://github.com/NoneGiven/MphRead/wiki).
+# Metroid Prime Hunters PC
 
-## Features
-- Recreates the gameplay of the original game
-- Stores save data to allow playing through the story mode
-- Renders individual models or complete game rooms with entities
-- Visualizes collision data for rooms and entities
-- Exports models to COLLADA, textures to PNG, and sound effects to WAV
-- Generates Python scripts to import model animations and more into Blender
+Adaptação experimental de **Metroid Prime Hunters** para **Windows x64**, baseada
+em [MphRead, de NoneGiven](https://github.com/NoneGiven/MphRead). A lógica e a
+renderização nativas vêm dessa base; esta versão acrescenta uma interface de PC,
+configurações, mapa e diário em uma única tela.
 
-## Planned
-- Room editor and save editor
-- Render more things, implement more gameplay logic
-- And even more!
+**[Downloads para Windows](https://github.com/GenissonEmilio/MetroidPrimeHuntersPC/releases)** ·
+[Guia e controles](README-PC.md) · [Validação](docs/VALIDACAO-PAINEIS-PC.md)
 
-## Usage
+## Instalar e jogar
 
-After setup, MphRead can be launched from the executable with no arguments, and menu prompts will appear to help you set up the scene.
+1. Baixe o ZIP **Windows x64** na página de releases e extraia a pasta inteira.
+2. Abra `HuntersPC.exe`. O runtime .NET e as bibliotecas de áudio já acompanham o pacote.
+3. Arraste sua própria ROM **USA revisão 0**, `.nds` ou ZIP com uma única ROM, para o menu.
+4. Escolha **TESTAR CONTROLES** para uma arena local ou **INICIAR / CONTINUAR** para a aventura.
 
-See the [full setup and export guide](https://github.com/NoneGiven/MphRead/wiki/Setup-&-Export-Guide) for details on setup and command line options.
+Requer Windows 10/11 de 64 bits e suporte a OpenGL 3.2. Não é necessário instalar
+o .NET para jogar. Não há ROM, BIOS, saves ou dados extraídos do jogo neste repositório
+ou nos pacotes públicos.
 
-## Building
+## Controles
 
-If you do not want to build from source, simply download and run the latest [release](https://github.com/NoneGiven/MphRead/releases).
+| Entrada | Ação |
+| --- | --- |
+| WASD / mouse | Movimento / câmera e mira |
+| Clique esquerdo / direito | Disparar / zoom |
+| Espaço / C | Pular ou boost / alternar forma |
+| E / Q | Visor / scan ou ataque alternativo |
+| Roda / 1–9 | Trocar / selecionar arma disponível |
+| M / J | Mapa local / diário de scans |
+| Tab nos painéis / Esc | Alternar mapa e diário / voltar ou pausar |
+| F11 / F12 | Tela cheia / captura local |
 
-### With Visual Studio
+Mapa, diário, pausa e gameplay usam a mesma janela. O mapa mostra geometria da
+sala, posição/direção, portas e salas já visitadas, com zoom e seleção de altura.
+O diário lista somente registros desbloqueados no save e usa os textos da ROM.
 
-With a recent version of [Visual Studio 2022 or 2026](https://visualstudio.microsoft.com/vs/) installed, you should be able to open the solution and build immediately.
+## Estado da versão
 
-### Without Visual Studio
+**Alpha experimental.** Foram verificados a arena Combat Hall, a primeira sala
+da aventura, HUD normal/Morph Ball e os fluxos de mapa/diário, com 30 verificações
+unitárias e 54 no runtime real. Isso não certifica campanha completa, todos os
+saves, todas as salas ou multiplayer online. O mapa é uma planta local por sala,
+e não a composição 3D regional original do DS. Leia as limitações da release.
 
-- Install the .NET SDK. The [latest stable version](https://dotnet.microsoft.com/en-us/download/dotnet/latest) is recommended, while the minimum required version is [.NET 9.0](https://dotnet.microsoft.com/en-us/download/dotnet/9.0).
-- Run `dotnet build` in the `src/MphRead` directory.
+Para atualizar, extraia o ZIP em uma pasta nova e copie, se quiser manter a
+instalação, as pastas `files/` e `Savedata/`, além de `pc-profile.json` e
+`rom-import.json`. `paths.txt` guarda caminhos absolutos; é mais simples reimportar
+a mesma ROM na pasta nova. Nunca distribua seus dados do jogo ou seus saves.
 
-## Acknowledgements
+## Compilar
 
-A significant portion of this project's code was based on the file format information or source code from several other projects.
+```powershell
+dotnet run --project tests/PcChecks/PcChecks.csproj -c Release
+.\scripts\build-pc.ps1
+.\scripts\package-windows.ps1
+```
 
-- **dsgraph** - The original MPH model viewer, on which all other projects are built.
-- **[Chemical's model format](https://gitlab.com/ch-mcl/metroid-prime-hunters-file-document/-/blob/master/Model/BinModel.md)** - Documentation of the model format.
-- **[McKay42's mph-model-viewer](https://github.com/McKay42/mph-model-viewer)** - COLLADA export method.
-- **[McKay42's mph-arc-extractor](https://github.com/McKay42/mph-arc-extractor)** - ARC file format information.
-- **[Barubary's dsdecmp](https://github.com/Barubary/dsdecmp)** - LZ10 compression routines.
-- **[loveemu's swav2wav](https://github.com/loveemu/loveemu-lab)** - SWAV conversion function.
-- **[Gericom's ffmpeg patch](https://lists.ffmpeg.org/pipermail/ffmpeg-devel/2021-March/277774.html)** - ActImagine VX movie file format information.
-- **[CharlesVanEeckhout's actimagine decoder](https://github.com/CharlesVanEeckhout/actimagine)** - Further understanding of VX video decoding, based on the above ffmpeg patch.
-- **[CyberBotX's NCSF](https://github.com/CyberBotX/NCSF)** - Source code for the NCSF converter and player for Nintendo DS sequenced music.
+Requer .NET SDK 9 ou compatível, Python 3.10+ e PowerShell 7 para os scripts.
+`build-pc.ps1` prepara uma instalação local;
+`package-windows.ps1` cria um ZIP novo sem dados pessoais ou conteúdo do jogo,
+com licenças, manifesto e checksum. Os avisos de dependências herdadas estão
+documentados em [Análise técnica](docs/ANALISE-PORT-PC.md).
 
-## Special Thanks
+## Créditos e licença
 
-This project's reverse engineering effort was developed parallel to **[hackyourlife's mph-viewer](https://github.com/hackyourlife/mph-viewer)**, a model viewer implementation in C. Major features such as the transparency rendering implementation were derived from its source code.
+Este projeto preserva o histórico, os créditos e a licença MIT do **MphRead**.
+Não é uma decompilação nova nem um trabalho afiliado à Nintendo. Consulte
+[README original](README-UPSTREAM.md), [LICENSE](LICENSE) e
+[componentes de terceiros](THIRD-PARTY-PC.md).

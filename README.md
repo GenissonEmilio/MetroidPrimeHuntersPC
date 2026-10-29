@@ -8,6 +8,16 @@ configurações, mapa e diário em uma única tela.
 **[Downloads para Windows e Linux](https://github.com/GenissonEmilio/MetroidPrimeHuntersPC/releases)** ·
 [Guia e controles](README-PC.md) · [Validação](docs/VALIDACAO-PAINEIS-PC.md)
 
+## Capturas de tela
+
+Versão Linux com gameplay e interface em uma única tela.
+
+![Exploração em primeira pessoa no Linux, com HUD e atalhos de teclado](docs/images/linux-primeira-pessoa.png)
+
+| Nave da Samus | Morph Ball |
+| :---: | :---: |
+| ![Nave da Samus vista em primeira pessoa no Linux](docs/images/linux-nave-samus.png) | ![Samus em Morph Ball no Linux, com indicadores de boost e bombas](docs/images/linux-morph-ball.png) |
+
 ## Instalar e jogar no Windows
 
 1. Baixe o ZIP **Windows x64** na página de releases e extraia a pasta inteira.

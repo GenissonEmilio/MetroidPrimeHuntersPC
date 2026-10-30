@@ -60,9 +60,14 @@ O diário lista somente registros desbloqueados no save e usa os textos da ROM.
 
 O código atual acrescenta abertura completa, título com a marca original,
 seleção de três arquivos e prólogo de uma nova aventura, adaptados à mesma
-janela. A arte e os vídeos são lidos da ROM importada. São 53 verificações
+janela. A arte e os vídeos são lidos da ROM importada. São 57 verificações
 unitárias; os testes de inicialização e seus limites estão em
 [Validação da inicialização](docs/VALIDACAO-INICIALIZACAO.md).
+
+O enquadramento dos vídeos acompanha a resolução real ao entrar em tela cheia.
+Gráficos melhorados vêm ligados: mipmaps, filtragem trilinear, anisotropia até
+16× e suavização de bordas, ajustáveis nas configurações. Veja
+[Validação dos gráficos](docs/VALIDACAO-GRAFICOS.md).
 
 **v0.2.0 — release principal, com Linux x64.** A base de jogo continua em
 desenvolvimento. Foram verificados a arena Combat Hall, a primeira sala

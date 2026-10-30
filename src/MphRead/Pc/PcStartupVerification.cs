@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using MphRead.Entities;
 using MphRead.Formats;
+using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.GraphicsLibraryFramework;
@@ -27,6 +28,9 @@ namespace MphRead
         private static string _otherSaveHash = "";
         private static readonly Stopwatch _movieTimer = new();
         private static Movie _timedMovie = Movie.None;
+        private static int _resizeStage;
+        private static bool _qualityChecked;
+        private static object? _graphics;
 
         public static void Run(string output)
         {
@@ -45,6 +49,8 @@ namespace MphRead
             bool accelerated = Environment.GetEnvironmentVariable("HUNTERSPC_VERIFY_REALTIME") != "1";
             _resume = false; Active = true; PcRuntime.AccelerateMovieVerification = accelerated;
             _timedMovie = Movie.None;
+            _resizeStage = 0; _qualityChecked = false;
+            _graphics = null;
             _postMovieFrames = 0; _arrivalCameraSeen = false;
             PcRuntime.MovieEnded = (movie, expected, played, skipped) =>
             {
@@ -88,7 +94,7 @@ namespace MphRead
                 File.WriteAllText(Path.Combine(output, "startup-verification.json"), JsonSerializer.Serialize(new
                 {
                     Success = failure == null, Failure = failure, UsesDesktopInput = false, VisibleWindows = false,
-                    AcceleratedMovieClock = accelerated, Checks = _checks, Movies = _movies, Captures = _captures, StateDirectory = state
+                    AcceleratedMovieClock = accelerated, Checks = _checks, Movies = _movies, Graphics = _graphics, Captures = _captures, StateDirectory = state
                 }, new JsonSerializerOptions { WriteIndented = true }));
                 Active = false; PcRuntime.AccelerateMovieVerification = false; PcRuntime.MovieEnded = null;
                 PcRuntime.Replay = null; PcRuntime.StateRoot = previousRoot; PcRuntime.Profile = previousProfile;
@@ -104,7 +110,7 @@ namespace MphRead
         private static void Capture(OpenTK.Windowing.Desktop.GameWindow window, string name)
         {
             if (!_captures.Add(name)) return;
-            PcCapture.Save(window.ClientSize, _output, name + ".png");
+            PcCapture.Save(window.FramebufferSize, _output, name + ".png");
             Check(File.ReadAllText(Path.Combine(_output, "gpu.txt")).Contains("GL error: NoError"), "OpenGL: " + name);
         }
         private static Vector2 WindowPoint(Vector2 point, Vector2i size)
@@ -120,6 +126,30 @@ namespace MphRead
                 _movieTimer.Restart();
             }
         }
+        private static void CheckMovieViewport(PcFrontEnd menu, string name)
+        {
+            int[] viewport = new int[4]; GL.GetInteger(GetPName.Viewport, viewport);
+            var size = menu.FramebufferSize;
+            Check(menu.OpeningScene!.Size == size && viewport[0] == 0 && viewport[1] == 0
+                && viewport[2] == size.X && viewport[3] == size.Y, "Movie covers the complete drawable: " + name);
+            byte[] pixel = new byte[4];
+            foreach (var point in new[] { new Vector2i(2, 2), new Vector2i(size.X - 3, size.Y - 3) })
+            {
+                GL.ReadPixels(point.X, point.Y, 1, 1, PixelFormat.Rgba, PixelType.UnsignedByte, pixel);
+                Check(pixel[0] < 3 && pixel[1] < 3 && pixel[2] < 3, "No white frame at movie boundary: " + name);
+            }
+            Capture(menu, name);
+        }
+        private static void ResizeMovie(PcFrontEnd menu)
+        {
+            if (menu.OpeningScene?.CurrentMovie != Movie.Opening || menu.OpeningScene.MovieFrameIndex < 320 || _resizeStage >= 4) return;
+            if (_resizeStage > 0) CheckMovieViewport(menu, new[] { "", "opening-1920x1080", "opening-2560x1080", "opening-1024x768" }[_resizeStage]);
+            var size = _resizeStage switch { 0 => new Vector2i(1920,1080), 1 => new Vector2i(2560,1080), 2 => new Vector2i(1024,768), _ => new Vector2i(1280,720) };
+            menu.ClientSize = size;
+            // Reproduce an overlay/fullscreen transition restoring a stale GL viewport.
+            GL.Viewport(137, 166, 1280, 720);
+            _resizeStage++;
+        }
         public static void AfterMenuFrame(PcFrontEnd menu)
         {
             if (!Active) return;
@@ -127,6 +157,7 @@ namespace MphRead
             if (menu.IsVisible || menu.CursorState == CursorState.Grabbed) throw new InvalidOperationException("Startup test touched the desktop.");
             ObserveMovie(menu.OpeningScene);
             if (menu.OpeningScene?.CurrentMovie == Movie.Opening && menu.OpeningScene.MovieFrameIndex >= 320) Capture(menu, "opening-original");
+            ResizeMovie(menu);
             if (_phase == 0)
             {
                 if (menu.Flow.Page != PcStartupPage.Title || ++_titleFrames < 2) return;
@@ -150,6 +181,11 @@ namespace MphRead
             else if (_phase == 4)
             {
                 Capture(menu, "settings"); Check(PcRuntime.Profile.MouseSensitivity == 1.1f, "Settings remain accessible from the selected file");
+                for (int i = 0; i < 6; i++) menu.HandleMenuKey(Keys.Down);
+                menu.HandleMenuKey(Keys.Enter);
+                Check(!PcRuntime.Profile.EnhancedGraphics && !PcProfile.Load(PcRuntime.ProfilePath).EnhancedGraphics, "Original graphics can be selected and persisted from the menu");
+                menu.HandleMenuPointer(WindowPoint(new(400, 520), menu.ClientSize), true);
+                Check(PcRuntime.Profile.EnhancedGraphics && PcProfile.Load(PcRuntime.ProfilePath).EnhancedGraphics, "Scaled mouse click restores enhanced graphics");
                 menu.HandleMenuKey(Keys.Escape); menu.HandleMenuKey(Keys.Escape); menu.HandleMenuKey(Keys.Down); menu.HandleMenuKey(Keys.Enter); _phase = 5;
             }
             else if (_phase == 5) { Capture(menu, "new-game-menu"); menu.HandleMenuKey(Keys.Enter); _phase = 6; }
@@ -188,6 +224,28 @@ namespace MphRead
                 && CameraSequence.Current?.Name != "unit2_land_intro" && game.Scene.FadeType == FadeType.None)
             {
                 if (!_resume) Check(_arrivalCameraSeen, "The native room-arrival camera ran to completion after the videos");
+                if (!_resume && !_qualityChecked)
+                {
+                    PcRuntime.Profile.EnhancedGraphics = false; game.Scene.OnRenderFrame(); Capture(game, "graphics-original");
+                    PcRuntime.Profile.EnhancedGraphics = true; game.Scene.OnRenderFrame(); Capture(game, "graphics-enhanced");
+                    Check(game.Scene.TextureFiltering.MipmappedTextures > 0, "World textures have mipmap chains");
+                    Check(game.Scene.TextureFiltering.MaxAnisotropy is >= 1 and <= 16, "Anisotropy respects GPU support and the 16X limit");
+                    int oldTexture = GL.GetInteger(GetPName.TextureBinding2D);
+                    GL.BindTexture(TextureTarget.Texture2D, game.Scene.TextureFiltering.LastModelTexture);
+                    GL.GetTexParameter(TextureTarget.Texture2D, GetTextureParameter.TextureMinFilter, out int minFilter);
+                    GL.GetTexParameter(TextureTarget.Texture2D, GetTextureParameter.TextureMagFilter, out int magFilter);
+                    GL.GetTexLevelParameter(TextureTarget.Texture2D, 1, GetTextureParameter.TextureWidth, out int mipWidth);
+                    float anisotropy = 1;
+                    if (game.Scene.TextureFiltering.MaxAnisotropy > 1)
+                        GL.GetTexParameter(TextureTarget.Texture2D, (GetTextureParameter)0x84FE, out anisotropy);
+                    GL.BindTexture(TextureTarget.Texture2D, oldTexture);
+                    Check(minFilter == (int)TextureMinFilter.LinearMipmapLinear && magFilter == (int)TextureMagFilter.Linear && mipWidth > 0, "GPU model sampler uses trilinear mipmaps and linear magnification");
+                    Check(anisotropy == game.Scene.TextureFiltering.MaxAnisotropy, "GPU sampler applies the supported anisotropy");
+                    _graphics = new { Anisotropy = anisotropy, GeneratedMipmaps = game.Scene.TextureFiltering.MipmappedTextures,
+                        MinFilter = "LinearMipmapLinear", MagFilter = "Linear", EdgeAntialiasing = true };
+                    Check(!File.ReadAllBytes(Path.Combine(_output, "graphics-original.png")).SequenceEqual(File.ReadAllBytes(Path.Combine(_output, "graphics-enhanced.png"))), "Graphics toggle changes the same frozen scene");
+                    _qualityChecked = true;
+                }
                 Check(Menu.SaveSlot == (_resume ? 3 : 1) && game.Scene.RoomId == 45, "Campaign reaches the selected save's room");
                 Capture(game, _resume ? "continue-room" : "new-game-room"); game.Close();
             }

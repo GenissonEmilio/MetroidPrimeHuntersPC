@@ -191,8 +191,34 @@ uniform float view_height;
 uniform vec4 fade_color;
 uniform sampler2D tex;
 uniform sampler2D mask;
+uniform bool antialias;
+uniform vec2 pixel_size;
 varying vec2 texcoord;
 varying vec4 color;
+
+// Edge-directed post-process AA. Only the 3D scene uses this path; glyphs,
+// visor overlays and movies are composited afterwards at their own resolution.
+vec4 filteredScene(vec2 uv)
+{
+    vec4 center = texture2D(tex, uv);
+    if (!antialias) return center;
+    vec3 weights = vec3(0.299, 0.587, 0.114);
+    float nw = dot(texture2D(tex, uv + pixel_size * vec2(-1, 1)).rgb, weights);
+    float ne = dot(texture2D(tex, uv + pixel_size * vec2(1, 1)).rgb, weights);
+    float sw = dot(texture2D(tex, uv + pixel_size * vec2(-1, -1)).rgb, weights);
+    float se = dot(texture2D(tex, uv + pixel_size * vec2(1, -1)).rgb, weights);
+    float mid = dot(center.rgb, weights);
+    float low = min(mid, min(min(nw, ne), min(sw, se)));
+    float high = max(mid, max(max(nw, ne), max(sw, se)));
+    if (high - low < max(0.0312, high * 0.125)) return center;
+    vec2 along = vec2(sw + se - nw - ne, nw + sw - ne - se);
+    float damp = max((nw + ne + sw + se) * 0.03125, 0.0078125);
+    along = clamp(along / (min(abs(along.x), abs(along.y)) + damp), vec2(-8), vec2(8)) * pixel_size;
+    vec3 inner = 0.5 * (texture2D(tex, uv - along / 6.0).rgb + texture2D(tex, uv + along / 6.0).rgb);
+    vec3 wider = inner * 0.5 + 0.25 * (texture2D(tex, uv - along * 0.5).rgb + texture2D(tex, uv + along * 0.5).rgb);
+    float luma = dot(wider, weights);
+    return vec4(luma < low || luma > high ? inner : wider, center.a);
+}
 
 void main()
 {
@@ -200,7 +226,7 @@ void main()
         gl_FragColor = fade_color;
     }
     else {
-        gl_FragColor = texture2D(tex, texcoord);
+        gl_FragColor = filteredScene(texcoord);
         if (use_mask) {
             float maskY = gl_FragCoord.y + (view_width - view_height) / 2;
             vec2 maskTexcoord = vec2(gl_FragCoord.x / view_width, 1 - maskY / view_width);
@@ -300,6 +326,8 @@ void main()
         public int ToonTable { get; set; }
         public int FadeColor { get; set; }
         public int LayerAlpha { get; set; }
+        public int Antialias { get; set; }
+        public int PixelSize { get; set; }
         public int UseMask { get; set; }
         public int ViewWidth { get; set; }
         public int ViewHeight { get; set; }

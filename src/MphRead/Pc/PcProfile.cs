@@ -12,6 +12,7 @@ namespace MphRead
         public bool InvertY { get; set; }
         public bool ShowHints { get; set; } = true;
         public bool Fullscreen { get; set; }
+        public bool EnhancedGraphics { get; set; } = true;
         public float SoundVolume { get; set; } = 0.35f;
         public float MusicVolume { get; set; } = 0.5f;
         public byte LastSaveSlot { get; set; } = 1;

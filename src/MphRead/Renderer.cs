@@ -471,6 +471,7 @@ namespace MphRead
         private int _frameBuffer = 0;
         private int _screenTexture = 0;
         private int _renderBuffer = 0;
+        internal PcTextureFiltering TextureFiltering { get; private set; } = null!;
 
         public void OnResize()
         {
@@ -489,6 +490,7 @@ namespace MphRead
 
         private void InitShaders()
         {
+            TextureFiltering = new PcTextureFiltering();
             string fragmentLog;
             string vertexLog;
             int vertexShader = GL.CreateShader(ShaderType.VertexShader);
@@ -588,6 +590,8 @@ namespace MphRead
             int magParameter = (int)TextureMagFilter.Nearest;
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, minParameter);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, magParameter);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
             GL.BindTexture(TextureTarget.Texture2D, 0);
             GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
                 TextureTarget.Texture2D, _screenTexture, 0);
@@ -641,6 +645,8 @@ namespace MphRead
             _shaderLocations.UseMask = GL.GetUniformLocation(_rttShaderProgramId, "use_mask");
             _shaderLocations.ViewWidth = GL.GetUniformLocation(_rttShaderProgramId, "view_width");
             _shaderLocations.ViewHeight = GL.GetUniformLocation(_rttShaderProgramId, "view_height");
+            _shaderLocations.Antialias = GL.GetUniformLocation(_rttShaderProgramId, "antialias");
+            _shaderLocations.PixelSize = GL.GetUniformLocation(_rttShaderProgramId, "pixel_size");
             int texLocation = GL.GetUniformLocation(_rttShaderProgramId, "tex");
             int maskLocation = GL.GetUniformLocation(_rttShaderProgramId, "mask");
             GL.UseProgram(_rttShaderProgramId);
@@ -1085,6 +1091,7 @@ namespace MphRead
 
         public void BindTexture(IReadOnlyList<ColorRgba> data, int width, int height, int bindingId)
         {
+            TextureFiltering?.Invalidate(bindingId);
             GL.BindTexture(TextureTarget.Texture2D, bindingId);
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, width, height, 0,
                 PixelFormat.Rgba, PixelType.UnsignedByte, data.ToArray());
@@ -1308,6 +1315,9 @@ namespace MphRead
 
         public bool OnRenderFrame()
         {
+            // Every pass must cover the current drawable, including movies and
+            // redraws after a fullscreen switch or an overlay restoring GL state.
+            GL.Viewport(0, 0, Size.X, Size.Y);
             // Paused PC panels skip OnUpdateFrame. Restore scene state here too,
             // before writing uniforms or redrawing the frozen scene.
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, _frameBuffer);
@@ -1430,6 +1440,17 @@ namespace MphRead
             GL.Enable(EnableCap.Blend);
             GL.BindTexture(TextureTarget.Texture2D, _screenTexture);
 
+            bool antialias = PcRuntime.Enabled && PcRuntime.Profile.EnhancedGraphics && !MoviePlaying
+                && PlayerEntity.Main.HudDisruptedState == 0 && PlayerEntity.Main.HudWhiteoutState == -1;
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter,
+                (int)(antialias ? TextureMinFilter.Linear : TextureMinFilter.Nearest));
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter,
+                (int)(antialias ? TextureMagFilter.Linear : TextureMagFilter.Nearest));
+            if (antialias)
+            {
+                GL.Uniform1(_shaderLocations.Antialias, 1);
+                GL.Uniform2(_shaderLocations.PixelSize, 1f / Size.X, 1f / Size.Y);
+            }
             GL.Begin(PrimitiveType.TriangleStrip);
             // top right
             GL.TexCoord3(1f, 1f, 0f);
@@ -1447,6 +1468,7 @@ namespace MphRead
 
             GL.BindTexture(TextureTarget.Texture2D, 0);
 
+            if (antialias) GL.Uniform1(_shaderLocations.Antialias, 0);
             if (PlayerEntity.Main.HudDisruptedState != 0 || PlayerEntity.Main.HudWhiteoutState != -1)
             {
                 GL.UseProgram(_rttShaderProgramId);
@@ -1570,6 +1592,7 @@ namespace MphRead
             {
                 foreach (KeyValuePair<int, (int BindingId, bool OnlyOpaque)> kvp in map)
                 {
+                    TextureFiltering.Invalidate(kvp.Value.BindingId);
                     GL.DeleteTexture(kvp.Value.BindingId);
                 }
                 _texPalMap.Remove(model.Id);
@@ -3675,10 +3698,7 @@ namespace MphRead
             if (item.HasTexture)
             {
                 GL.BindTexture(TextureTarget.Texture2D, item.TextureBindingId);
-                int minParameter = _textureFiltering ? (int)TextureMinFilter.Linear : (int)TextureMinFilter.Nearest;
-                int magParameter = _textureFiltering ? (int)TextureMagFilter.Linear : (int)TextureMagFilter.Nearest;
-                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, minParameter);
-                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, magParameter);
+                TextureFiltering.Model(item.TextureBindingId, _textureFiltering);
                 switch (item.XRepeat)
                 {
                 case RepeatMode.Clamp:
@@ -4909,7 +4929,7 @@ namespace MphRead
                 _pcMenu = new PcMenu(true, () => SetPcPause(false), Close, TogglePcFullscreen,
                     map: () => OpenPcArchive(PcFieldView.Map), journal: () => OpenPcArchive(PcFieldView.Journal));
             }
-            Scene = new Scene(Size, KeyboardState, MouseState, (string title) =>
+            Scene = new Scene(FramebufferSize, KeyboardState, MouseState, (string title) =>
             {
                 Title = title;
             }, () =>
@@ -4960,12 +4980,14 @@ namespace MphRead
 
         protected override void OnLoad()
         {
+            PcPresentation.Sync(this, Scene);
             Scene.OnLoad();
             base.OnLoad();
         }
 
         protected override void OnRenderFrame(FrameEventArgs args)
         {
+            if (!PcPresentation.Sync(this, Scene)) return;
             PcVerification.BeforeFrame(this);
             PcStartupVerification.BeforeGameFrame(this);
             CursorState = !PcVerification.Active && !PcStartupVerification.Active && IsFocused && !_pcMenuOpen && !Scene.MoviePlaying && Scene.ActiveCutscene == -1 && CameraSequence.Current?.BlockInput != true && Scene.CameraMode == CameraMode.Player && !Scene.FrameAdvance && !Scene.ShowCursor && !GameState.DialogPause
@@ -4982,15 +5004,15 @@ namespace MphRead
             {
                 return;
             }
-            if (PcView == PcFieldView.Map) PcMap?.Draw(ClientSize);
-            else if (PcView == PcFieldView.Journal) PcJournal?.Draw(ClientSize);
-            else if (_pcMenuOpen) _pcMenu?.Draw(ClientSize);
-            else if (PcRuntime.Enabled && Scene.MoviePlaying) PcStartupArt.SkipHint(ClientSize);
+            if (PcView == PcFieldView.Map) PcMap?.Draw(FramebufferSize);
+            else if (PcView == PcFieldView.Journal) PcJournal?.Draw(FramebufferSize);
+            else if (_pcMenuOpen) _pcMenu?.Draw(FramebufferSize);
+            else if (PcRuntime.Enabled && Scene.MoviePlaying) PcStartupArt.SkipHint(FramebufferSize);
             else if (PcRuntime.Enabled && PcRuntime.Profile.ShowHints && !GameState.DialogPause && !Scene.MoviePlaying && Scene.ActiveCutscene == -1 && CameraSequence.Current?.BlockInput != true)
             {
-                PcHud.Draw(ClientSize);
+                PcHud.Draw(FramebufferSize);
             }
-            if (_pcCapture) { PcCapture.Save(ClientSize); _pcCapture = false; }
+            if (_pcCapture) { PcCapture.Save(FramebufferSize); _pcCapture = false; }
             PcVerification.AfterFrame(this);
             PcStartupVerification.AfterGameFrame(this);
             SwapBuffers();
@@ -5005,10 +5027,7 @@ namespace MphRead
 
         protected override void OnResize(ResizeEventArgs e)
         {
-            GL.Viewport(0, 0, e.Size.X, e.Size.Y);
-            if (Scene == null || e.Size.X <= 0 || e.Size.Y <= 0) return;
-            Scene.Size = e.Size;
-            Scene.OnResize();
+            PcPresentation.Sync(this, Scene);
             base.OnResize(e);
         }
 

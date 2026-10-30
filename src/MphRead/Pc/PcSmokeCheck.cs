@@ -3,11 +3,31 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using OpenTK.Audio.OpenAL;
+using OpenTK.Graphics.OpenGL;
 
 namespace MphRead
 {
     internal static class PcSmokeCheck
     {
+        internal static void CheckPresentationShader()
+        {
+            int vertex = GL.CreateShader(ShaderType.VertexShader);
+            int fragment = GL.CreateShader(ShaderType.FragmentShader);
+            int program = GL.CreateProgram();
+            try
+            {
+                GL.ShaderSource(vertex, Shaders.RttVertexShader); GL.CompileShader(vertex);
+                GL.ShaderSource(fragment, Shaders.RttFragmentShader); GL.CompileShader(fragment);
+                GL.GetShader(vertex, ShaderParameter.CompileStatus, out int vertexOk);
+                GL.GetShader(fragment, ShaderParameter.CompileStatus, out int fragmentOk);
+                if (vertexOk == 0 || fragmentOk == 0)
+                    throw new InvalidOperationException("Shader de apresentacao: " + GL.GetShaderInfoLog(vertex) + GL.GetShaderInfoLog(fragment));
+                GL.AttachShader(program, vertex); GL.AttachShader(program, fragment); GL.LinkProgram(program);
+                GL.GetProgram(program, GetProgramParameterName.LinkStatus, out int linked);
+                if (linked == 0) throw new InvalidOperationException("Link do shader: " + GL.GetProgramInfoLog(program));
+            }
+            finally { GL.DeleteProgram(program); GL.DeleteShader(vertex); GL.DeleteShader(fragment); }
+        }
         public static void Run(string output)
         {
             Directory.CreateDirectory(output);
@@ -54,7 +74,7 @@ namespace MphRead
                     Runtime = RuntimeInformation.FrameworkDescription,
                     OpenAL = audio, UsesDesktopInput = false, VisibleWindows = false,
                     GameplayTested = false,
-                    Checks = new[] { "OpenGL menu", "Settings persistence", "4:3 resize", "OpenAL device/context", "SoundFlow MiniAudio backend" }
+                    Checks = new[] { "OpenGL menu", "Settings persistence", "4:3 resize", "OpenAL device/context", "SoundFlow MiniAudio backend", "Scene presentation/AA shader" }
                 }, new JsonSerializerOptions { WriteIndented = true }));
                 PcRuntime.StateRoot = previousRoot;
                 PcRuntime.Profile = previousProfile;

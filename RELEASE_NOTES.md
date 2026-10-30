@@ -1,5 +1,10 @@
 # Próxima atualização — abertura e arquivos
 
+- Correção do viewport das cutscenes ao mudar para tela cheia, redimensionar ou
+  usar escala de DPI diferente; o desenho acompanha os pixels do framebuffer.
+- Gráficos melhorados por padrão: mipmaps, trilinear, anisotropia até 16× e
+  suavização de bordas na cena 3D. Configurações permitem voltar ao visual original.
+- Vídeos ampliados com filtragem linear, mantendo a proporção original.
 - Abertura original completa antes do título, com a marca lida da ROM.
 - Clique ou tecla no título abre três arquivos, com checkpoint e progresso reais.
 - Novo jogo reproduz prólogo, chegada e câmera da primeira sala; continuar usa
@@ -8,7 +13,7 @@
   todos os quadros e só são pulados por comando explícito.
 - Menu, arquivos e configurações ficam na mesma janela; WASD, mouse, mapa e
   diário continuam disponíveis.
-- 53 verificações sem ROM e replay de inicialização com saves isolados. Consulte
+- 57 verificações sem ROM e replay de inicialização com saves isolados. Consulte
   `docs/VALIDACAO-INICIALIZACAO.md` para resultados e limites.
 
 # Metroid Prime Hunters PC v0.2.0 — Linux e Windows x64

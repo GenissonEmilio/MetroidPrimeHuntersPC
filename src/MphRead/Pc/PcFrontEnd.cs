@@ -48,6 +48,7 @@ namespace MphRead
 
         protected override void OnLoad()
         {
+            PcPresentation.Sync(this, null);
             if (PcRom.Ready && _smokeOutput == null) StartPresentation();
             base.OnLoad();
         }
@@ -55,7 +56,7 @@ namespace MphRead
         private void StartPresentation()
         {
             Menu.SaveSlot = 0;
-            _opening = new Scene(ClientSize, KeyboardState, MouseState, _ => { }, Close);
+            _opening = new Scene(FramebufferSize, KeyboardState, MouseState, _ => { }, Close);
             Sfx.Load(_opening); GameState.Mode = GameMode.Unknown15;
             if (Flow.Page == PcStartupPage.Opening)
                 _opening.StartMovie(Movie.Opening, FadeType.FadeOutInBlack, 0, FadeType.FadeOutBlack, 0, afterMovieAction: AfterMovie.StartGame);
@@ -77,6 +78,7 @@ namespace MphRead
         }
         protected override void OnRenderFrame(FrameEventArgs args)
         {
+            if (!PcPresentation.Sync(this, _opening)) return;
             _time += args.Time;
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
             if (Flow.Page == PcStartupPage.Opening && _opening != null)
@@ -89,18 +91,18 @@ namespace MphRead
                     Flow.FinishOpening();
                     PlayTitleMusic();
                 }
-                if (Flow.Page == PcStartupPage.Opening) PcStartupArt.SkipHint(ClientSize, "ESC  PULAR ABERTURA");
+                if (Flow.Page == PcStartupPage.Opening) PcStartupArt.SkipHint(FramebufferSize, "ESC  PULAR ABERTURA");
             }
             else { if (_opening != null) Sfx.Update((float)args.Time); DrawPage(); }
             if (_smokeOutput != null) SmokeFrame();
             PcStartupVerification.AfterMenuFrame(this);
-            if (_capture) { PcCapture.Save(ClientSize); _capture = false; }
+            if (_capture) { PcCapture.Save(FramebufferSize); _capture = false; }
             SwapBuffers(); base.OnRenderFrame(args);
         }
         private void DrawPage()
         {
-            if (Flow.Page == PcStartupPage.Menu && _menu.IsSettings) { _menu.Draw(ClientSize); return; }
-            using (var canvas = new PcCanvas(ClientSize))
+            if (Flow.Page == PcStartupPage.Menu && _menu.IsSettings) { _menu.Draw(FramebufferSize); return; }
+            using (var canvas = new PcCanvas(FramebufferSize))
             {
                 PcStartupArt.Background(_time);
                 if (Flow.Page == PcStartupPage.Title)
@@ -129,7 +131,7 @@ namespace MphRead
                 }
                 if (_status.Length != 0) PcCanvas.Text(72, 686, PcText.Ellipsis(_status, 110), 1.6f, PcCanvas.Amber);
             }
-            if (Flow.Page == PcStartupPage.Menu) _menu.Draw(ClientSize, backdrop: false);
+            if (Flow.Page == PcStartupPage.Menu) _menu.Draw(FramebufferSize, backdrop: false);
         }
         private void DrawFiles()
         {
@@ -179,11 +181,12 @@ namespace MphRead
             if (IsVisible || CursorState == CursorState.Grabbed) throw new InvalidOperationException("Teste deve ficar oculto, com cursor livre.");
             if (_smokeFrame == 2)
             {
-                PcCapture.Save(ClientSize, _smokeOutput, "menu.png"); HandleMenuKey(Keys.Enter); HandleMenuKey(Keys.Enter);
+                PcSmokeCheck.CheckPresentationShader();
+                PcCapture.Save(FramebufferSize, _smokeOutput, "menu.png"); HandleMenuKey(Keys.Enter); HandleMenuKey(Keys.Enter);
                 HandleMenuKey(Keys.Down); HandleMenuKey(Keys.Down); HandleMenuKey(Keys.Enter); HandleMenuKey(Keys.Right);
             }
-            if (_smokeFrame == 5) { PcCapture.Save(ClientSize, _smokeOutput, "settings.png"); HandleMenuKey(Keys.Escape); ClientSize = new(1024, 768); }
-            if (_smokeFrame == 8) { PcCapture.Save(ClientSize, _smokeOutput, "menu-1024x768.png"); Close(); }
+            if (_smokeFrame == 5) { PcCapture.Save(FramebufferSize, _smokeOutput, "settings.png"); HandleMenuKey(Keys.Escape); ClientSize = new(1024, 768); }
+            if (_smokeFrame == 8) { PcCapture.Save(FramebufferSize, _smokeOutput, "menu-1024x768.png"); Close(); }
             _smokeFrame++;
         }
         protected override void OnKeyDown(KeyboardKeyEventArgs e)
@@ -201,7 +204,7 @@ namespace MphRead
         }
         protected override void OnResize(ResizeEventArgs e)
         {
-            if (_opening != null && e.Size.X > 0 && e.Size.Y > 0) { _opening.Size = e.Size; _opening.OnResize(); }
+            PcPresentation.Sync(this, _opening);
             base.OnResize(e);
         }
         protected override void OnUnload() { _opening?.DoCleanup(); _art.Dispose(); base.OnUnload(); }

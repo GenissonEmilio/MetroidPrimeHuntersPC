@@ -33,6 +33,7 @@ try
     Check(Paths.Combine("models", @"sub\model.bin") == Path.Combine("models", "sub", "model.bin"),
         "ROM asset paths use native separators");
     Check(PcProfile.Load(path).MouseSensitivity == 1, "Missing profile has usable defaults");
+    Check(PcProfile.Load(path).EnhancedGraphics, "Enhanced graphics default on for new and existing profiles");
     File.WriteAllText(path, "{ broken");
     Check(PcProfile.Load(path).MouseSensitivity == 1, "Broken JSON does not block startup");
     var profile = new PcProfile { MouseSensitivity = 12, SoundVolume = -1, MusicVolume = float.NaN, InvertY = true };
@@ -41,6 +42,10 @@ try
     Check(profile.MouseSensitivity == 4 && profile.SoundVolume == 0 && profile.MusicVolume == 0.5f && profile.InvertY,
         "Profile validates limits and round trips persistent controls");
     Check(!File.Exists(path + ".tmp"), "Atomic profile save leaves no temporary file");
+    profile.EnhancedGraphics = false; profile.Save(path);
+    Check(!PcProfile.Load(path).EnhancedGraphics, "Original graphics choice persists across launches");
+    Check(PcLayout.HitRow(new Vector2(90, 565), 8) == 7, "Expanded settings keep the Back button accessible");
+    Check(PcLayout.HitRow(new Vector2(90, 499), 8) == -1, "Expanded settings preserve gaps between buttons");
     foreach (var size in new[] { new Vector2i(1280, 720), new Vector2i(1920, 1080), new Vector2i(1024, 768), new Vector2i(2560, 1080) })
     {
         float scale = Math.Min(size.X / 1280f, size.Y / 720f);

@@ -18,10 +18,13 @@ namespace MphRead
 
         public static int HitRow(Vector2 point, int count)
         {
-            if (point.X < 72 || point.X > 676 || point.Y < 226) return -1;
-            int row = (int)((point.Y - 226) / 58);
-            return row < count && point.Y < 226 + row * 58 + 50 ? row : -1;
+            var layout = MenuRows(count);
+            if (point.X < 72 || point.X > 676 || point.Y < layout.Top) return -1;
+            int row = (int)((point.Y - layout.Top) / layout.Step);
+            return row < count && point.Y < layout.Top + row * layout.Step + layout.Height ? row : -1;
         }
+        public static (float Top, float Step, float Height) MenuRows(int count)
+            => count > 7 ? (202, 50, 44) : (226, 58, 50);
     }
 
     // An original, code-drawn bitmap alphabet; no game assets or external fonts.

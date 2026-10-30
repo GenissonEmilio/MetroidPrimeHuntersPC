@@ -384,8 +384,9 @@ namespace MphRead
             void DrawScreen(int movieBinding, byte[] imageBuffer, float y, float left = -0.5f, float right = 0.5f, float height = 1)
             {
                 GL.BindTexture(TextureTarget.Texture2D, movieBinding);
-                int minParameter = (int)TextureMinFilter.Nearest;
-                int magParameter = (int)TextureMagFilter.Nearest;
+                bool smooth = PcRuntime.Enabled && PcRuntime.Profile.EnhancedGraphics;
+                int minParameter = (int)(smooth ? TextureMinFilter.Linear : TextureMinFilter.Nearest);
+                int magParameter = (int)(smooth ? TextureMagFilter.Linear : TextureMagFilter.Nearest);
                 GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, minParameter);
                 GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, magParameter);
                 GL.TexParameter(TextureTarget.Texture2D,

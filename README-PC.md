@@ -33,6 +33,12 @@ teclas de movimento não pulam essas cenas.
 O menu recebe cliques e teclado. Ajuste sensibilidade, inversão de Y, dicas,
 volumes e tela cheia em **CONFIGURACOES**. Salve a campanha pela nave antes de sair.
 
+**GRAFICOS: MELHORADOS** vem ligado por padrão: filtragem trilinear com mipmaps,
+anisotropia até 16× conforme a GPU e suavização de bordas na cena 3D. Vídeos usam
+amostragem suave; os textos e atlas do HUD mantêm sua nitidez. A opção
+**ORIGINAIS** desliga esses filtros, inclusive durante o jogo. Os filtros usam
+as texturas da ROM; não substituem os arquivos por um pacote de texturas HD.
+
 Em uma cópia sem dados, arraste sua ROM USA revisão 0 ou Europa revisão 1 `.nds` ou seu ZIP para
 a janela do menu. Os dados são extraídos uma vez na pasta do executável.
 O mapa usa a geometria da ROM, marca sua posição e as portas da sala atual e

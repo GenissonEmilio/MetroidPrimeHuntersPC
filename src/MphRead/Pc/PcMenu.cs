@@ -43,6 +43,7 @@ namespace MphRead
                 Add(() => $"TELA CHEIA  {OnOff(PcRuntime.Profile.Fullscreen)}", "Alternar tambem com F11 durante o jogo.", _ => fullscreen());
                 Add(() => $"EFEITOS     {PcRuntime.Profile.SoundVolume:P0}", "Setas esquerda / direita ou clique para ajustar.", d => PcRuntime.Profile.SoundVolume = Math.Clamp(PcRuntime.Profile.SoundVolume + d * 0.05f, 0, 1));
                 Add(() => $"MUSICA      {PcRuntime.Profile.MusicVolume:P0}", "Volume independente para a musica do jogo.", d => PcRuntime.Profile.MusicVolume = Math.Clamp(PcRuntime.Profile.MusicVolume + d * 0.05f, 0, 1));
+                Add(() => $"GRAFICOS    {(PcRuntime.Profile.EnhancedGraphics ? "MELHORADOS" : "ORIGINAIS")}", "Texturas suaves, mipmaps, anisotropia ate 16X e antialiasing.", _ => PcRuntime.Profile.EnhancedGraphics = !PcRuntime.Profile.EnhancedGraphics);
                 Add(() => "VOLTAR", "Retornar ao menu anterior.", _ => Main());
             }
             _resetMain = Main;
@@ -83,13 +84,13 @@ namespace MphRead
         {
             using var canvas = new PcCanvas(size);
             if (backdrop) PcCanvas.Background(_pause);
-            // Seven settings rows use the same hit boxes as the four main rows.
+            var layout = PcLayout.MenuRows(_rows.Count);
             for (int i = 0; i < _rows.Count; i++)
             {
-                float y = 226 + i * 58;
+                float y = layout.Top + i * layout.Step;
                 bool selected = i == _selected;
-                PcCanvas.Rect(72, y, 604, 50, selected ? new Color4(0.13f, 0.23f, 0.28f, 1) : new Color4(0.07f, 0.10f, 0.14f, 1));
-                if (selected) PcCanvas.Rect(72, y, 4, 50, PcCanvas.Cyan);
+                PcCanvas.Rect(72, y, 604, layout.Height, selected ? new Color4(0.13f, 0.23f, 0.28f, 1) : new Color4(0.07f, 0.10f, 0.14f, 1));
+                if (selected) PcCanvas.Rect(72, y, 4, layout.Height, PcCanvas.Cyan);
                 PcCanvas.Text(94, y + 17, selected ? ">" : " ", 2, PcCanvas.Cyan);
                 PcCanvas.Text(122, y + 17, _rows[i].Label(), 2, selected ? PcCanvas.White : PcCanvas.Muted);
             }

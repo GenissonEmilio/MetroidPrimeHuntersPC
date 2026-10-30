@@ -33,7 +33,7 @@ namespace MphRead
         private const int _frameHeight = 192;
         private int _topMovieBinding = -1;
         private int _botMovieBinding = -1;
-        private int _movieFrameCount = 0;
+        private volatile int _movieFrameCount = 0;
         private int _movieFrameIndex = -1;
         private int _lastRenderedMovieFrameIndex = 0;
         private int _movieFrameTotal = 0;
@@ -46,6 +46,14 @@ namespace MphRead
         private readonly byte[] _topImageBuffer = new byte[_frameWidth * _frameHeight * 3];
         private readonly byte[] _botImageBuffer = new byte[_frameWidth * _frameHeight * 3];
         private CancellationTokenSource _decoderCts = null!;
+        private Task[] _movieDecoders = Array.Empty<Task>();
+        private Task? _movieAudioTask;
+        private readonly Stopwatch _movieTimer = new();
+        private MoviePlaybackClock? _movieClock;
+        private double _verificationMovieTime;
+        public int MovieFrameIndex => _movieFrameIndex;
+        public int MovieFrameTotal => _movieFrameTotal;
+        public Movie CurrentMovie => MoviePlaying ? _movieSettings.MovieId : Movie.None;
 
         public void StartMovies(Movie movieId, Movie afterMovieId, FadeType fadeToMovieType, float fadeToMovieLength,
             FadeType fadeFromMovieType, float fadeFromMovieLength, AfterMovie afterMovieAction = AfterMovie.LoadRoom)
@@ -90,6 +98,7 @@ namespace MphRead
             Sfx.LongSfxMute++;
             Sfx.TimedSfxMute++;
             Sfx.ForceFieldSfxMute++;
+            StopMovieWorkers();
             VxDecoder.Instance1.Reset();
             VxDecoder.Instance2.Reset();
             _decoderCts = new CancellationTokenSource();
@@ -107,11 +116,13 @@ namespace MphRead
             Metadata.MovieInfo info = Metadata.MovieFiles[(int)movieId];
             _dualScreenMovie = info.BottomScreenPath != null;
             string topPath = Paths.Combine(Paths.FileSystem, info.TopScreenPath);
-            Task.Run(async () => await VxDecoder.Instance1.Decode(topPath, token: _decoderCts.Token), _decoderCts.Token);
+            Task topDecoder = Task.Run(() => VxDecoder.Instance1.Decode(topPath, token: _decoderCts.Token));
+            _movieDecoders = new[] { topDecoder };
             if (_dualScreenMovie)
             {
                 string botPath = Paths.Combine(Paths.FileSystem, info.BottomScreenPath!);
-                Task.Run(async () => await VxDecoder.Instance2.Decode(botPath, token: _decoderCts.Token), _decoderCts.Token);
+                Task bottomDecoder = Task.Run(() => VxDecoder.Instance2.Decode(botPath, token: _decoderCts.Token));
+                _movieDecoders = new[] { topDecoder, bottomDecoder };
             }
             else
             {
@@ -119,17 +130,11 @@ namespace MphRead
             }
             // start with a few frames to make sure audio doesn't run out
             // (note that even if we don't sleep, we'll hit the max of 4 anyway)
-            while (VxDecoder.Instance1.FramesQueued < 4)
-            {
-                Thread.Sleep(TimeSpan.FromMilliseconds(10));
-            }
+            WaitForMovieFrames(VxDecoder.Instance1, topDecoder);
             VxDecoder.Instance1.GetImage(frameIndex: 0, _topImageBuffer);
             if (_dualScreenMovie)
             {
-                while (VxDecoder.Instance2.FramesQueued < 4)
-                {
-                    Thread.Sleep(TimeSpan.FromMilliseconds(10));
-                }
+                WaitForMovieFrames(VxDecoder.Instance2, _movieDecoders[1]);
                 VxDecoder.Instance2.GetImage(frameIndex: 0, _botImageBuffer);
             }
             if (_topMovieBinding == -1)
@@ -150,7 +155,10 @@ namespace MphRead
             _movieFrameIndex = 0;
             _movieFrameCount = 0;
             _skipMovie = false;
-            Task.Run(async () =>
+            _movieClock = new MoviePlaybackClock(_movieFrameTotal, (double)VxDecoder.Instance1.FrameRate);
+            _verificationMovieTime = 0;
+            _movieTimer.Restart();
+            _movieAudioTask = Task.Run(async () =>
             {
                 // while loop outside the method so we can use stackalloc without limitation (possibly different sizes each iteration)
                 while (!_decoderCts.Token.IsCancellationRequested && _movieFrameCount != Int32.MaxValue)
@@ -158,7 +166,34 @@ namespace MphRead
                     await UpdateMovieAudio(_decoderCts.Token);
                 }
             }, _decoderCts.Token);
-            Task.Run(async () => await UpdateMovieImage(_decoderCts.Token), _decoderCts.Token);
+        }
+
+        private static void WaitForMovieFrames(VxDecoder decoder, Task task)
+        {
+            var timeout = Stopwatch.StartNew();
+            while (!decoder.HasImage(0) || decoder.FramesQueued < Math.Min(4, decoder.FrameCount))
+            {
+                if (task.IsCompleted) { task.GetAwaiter().GetResult(); if (!decoder.HasImage(0)) throw new InvalidDataException("Cutscene sem quadros."); break; }
+                if (timeout.Elapsed.TotalSeconds > 30) throw new TimeoutException("A cutscene nao iniciou a decodificacao.");
+                Thread.Sleep(1);
+            }
+        }
+
+        private void StopMovieWorkers()
+        {
+            _decoderCts?.Cancel();
+            foreach (Task task in _movieDecoders)
+            {
+                try { task.GetAwaiter().GetResult(); } catch (OperationCanceledException) { }
+            }
+            if (_movieAudioTask != null)
+            {
+                try { _movieAudioTask.GetAwaiter().GetResult(); } catch (OperationCanceledException) { }
+            }
+            _movieDecoders = Array.Empty<Task>();
+            _movieAudioTask = null;
+            _decoderCts?.Dispose();
+            _decoderCts = null!;
         }
 
         private int _audioHandle = -1;
@@ -171,8 +206,9 @@ namespace MphRead
         private async Task UpdateMovieAudio(CancellationToken token)
         {
             Span<short> stereoBuffer = stackalloc short[128 * 2];
-            bool initial = _audioBufferIndex == 0;
-            int framesAvailable = VxDecoder.Instance1.AudioFrameTotal - _audioBufferIndex;
+            int audioFrames = VxDecoder.Instance1.AudioFrameTotal;
+            if (_dualScreenMovie) audioFrames = Math.Min(audioFrames, VxDecoder.Instance2.AudioFrameTotal);
+            int framesAvailable = audioFrames - _audioBufferIndex;
             if (framesAvailable > 0)
             {
                 int buffersAvailable = 0;
@@ -251,6 +287,8 @@ namespace MphRead
 
         private void StopMovie()
         {
+            PcRuntime.MovieEnded?.Invoke(_movieSettings.MovieId, _movieFrameTotal, _movieFrameIndex + 1, _skipMovie);
+            StopMovieWorkers();
             if (_audioHandle != -1)
             {
                 AL.SourceStop(_audioHandle);
@@ -263,7 +301,6 @@ namespace MphRead
                 Sfx.LongSfxMute--;
                 Sfx.TimedSfxMute--;
                 Sfx.ForceFieldSfxMute--;
-                _decoderCts?.Cancel();
                 _movieSettings.MovieId = _movieSettings.AfterMovieId.Value;
                 _movieSettings.AfterMovieId = null;
                 PlayMovie(_movieSettings.MovieId);
@@ -293,7 +330,6 @@ namespace MphRead
                 Sfx.TimedSfxMute--;
                 Sfx.ForceFieldSfxMute--;
                 GameState.UnpauseDialog();
-                _decoderCts?.Cancel();
                 _movieFrameIndex = -1;
             }
         }
@@ -317,48 +353,26 @@ namespace MphRead
                 }
                 return;
             }
-        }
-
-        private async Task UpdateMovieImage(CancellationToken token)
-        {
-            TimeSpan frameTime = TimeSpan.FromSeconds(1 / 15.0);
-            TimeSpan nextFrameElapsed = frameTime;
-            // tolerance is used mainly so the audio doesn't run out if we end up sleeping a bit past the next 15 fps mark
-            // there are either 11 or 12 audio frames per video frame, which balance each other out, but will drift unless the video waits are balanced
-            TimeSpan tolerance = TimeSpan.FromMilliseconds(15);
-            var sw = new Stopwatch();
-            sw.Start();
-            while (!token.IsCancellationRequested && _movieFrameCount != Int32.MaxValue)
+            if (_movieClock == null || _movieFrameCount == Int32.MaxValue) return;
+            foreach (Task decoder in _movieDecoders)
+                if (decoder.IsFaulted) decoder.GetAwaiter().GetResult();
+            int next = _movieFrameIndex + 1;
+            bool ready = VxDecoder.Instance1.HasImage(next) && (!_dualScreenMovie || VxDecoder.Instance2.HasImage(next));
+            double elapsed = _movieTimer.Elapsed.TotalSeconds;
+            if (PcRuntime.AccelerateMovieVerification)
+                elapsed = _verificationMovieTime += _movieClock.FrameDuration;
+            MovieClockStep step = _movieClock.Step(elapsed, ready);
+            if (step == MovieClockStep.Complete)
             {
-                TimeSpan elapsed = sw.Elapsed;
-                if (elapsed >= nextFrameElapsed && nextFrameElapsed - elapsed < tolerance)
-                {
-                    _movieFrameCount++;
-                    nextFrameElapsed += frameTime;
-                }
-                int frameIndex = _movieFrameCount;
-                if (_movieFrameCount != _movieFrameIndex)
-                {
-                    if (frameIndex == _movieFrameTotal)
-                    {
-                        _movieFrameCount = Int32.MaxValue;
-                        SetFade(_movieSettings.AfterFadeType, _movieSettings.AfterFadeLength, overwrite: true, AfterFade.StopMovie);
-                        return;
-                    }
-                    if (frameIndex < _movieFrameTotal)
-                    {
-                        if (VxDecoder.Instance1.GetImage(frameIndex, _topImageBuffer)
-                            && !_dualScreenMovie || VxDecoder.Instance2.GetImage(frameIndex, _botImageBuffer))
-                        {
-                            _movieFrameIndex = frameIndex;
-                        }
-                    }
-                }
-                try
-                {
-                    await Task.Delay(1);
-                }
-                catch (TaskCanceledException) { }
+                _movieFrameCount = Int32.MaxValue;
+                SetFade(_movieSettings.AfterFadeType, _movieSettings.AfterFadeLength, overwrite: true, AfterFade.StopMovie);
+            }
+            else if (step == MovieClockStep.Advance)
+            {
+                // Both decoder frames must exist before either one is consumed.
+                VxDecoder.Instance1.GetImage(next, _topImageBuffer);
+                if (_dualScreenMovie) VxDecoder.Instance2.GetImage(next, _botImageBuffer);
+                _movieFrameIndex = _movieFrameCount = next;
             }
         }
 
@@ -367,7 +381,7 @@ namespace MphRead
             GL.Uniform1(_shaderLocations.LayerAlpha, 1);
             bool newFrame = false;
 
-            void DrawScreen(int movieBinding, byte[] imageBuffer, float y)
+            void DrawScreen(int movieBinding, byte[] imageBuffer, float y, float left = -0.5f, float right = 0.5f, float height = 1)
             {
                 GL.BindTexture(TextureTarget.Texture2D, movieBinding);
                 int minParameter = (int)TextureMinFilter.Nearest;
@@ -387,16 +401,16 @@ namespace MphRead
                 GL.Begin(PrimitiveType.TriangleStrip);
                 // top right
                 GL.TexCoord3(1f, 0f, 0f);
-                GL.Vertex3(0.5f, y, 0f);
+                GL.Vertex3(right, y, 0f);
                 // top left
                 GL.TexCoord3(0f, 0f, 0f);
-                GL.Vertex3(-0.5f, y, 0f);
+                GL.Vertex3(left, y, 0f);
                 // bottom right
                 GL.TexCoord3(1f, 1f, 0f);
-                GL.Vertex3(0.5f, y - 1, 0f);
+                GL.Vertex3(right, y - height, 0f);
                 // bottom left
                 GL.TexCoord3(0f, 1f, 0f);
-                GL.Vertex3(-0.5f, y - 1, 0f);
+                GL.Vertex3(left, y - height, 0f);
                 GL.End();
                 GL.BindTexture(TextureTarget.Texture2D, 0);
             }
@@ -416,8 +430,25 @@ namespace MphRead
             GL.TexCoord3(0f, 0f, 0f);
             GL.Vertex3(-1f, -1f, 0f);
             GL.End();
-            DrawScreen(_topMovieBinding, _topImageBuffer, y: 1);
-            DrawScreen(_botMovieBinding, _botImageBuffer, y: 0);
+            if (PcRuntime.Enabled)
+            {
+                // One cinematic canvas, with the complete original pictures and no simulated DS hinge.
+                float aspect = Size.X / (float)Math.Max(1, Size.Y);
+                float movieAspect = _dualScreenMovie ? 8f / 3 : 4f / 3;
+                float halfWidth = Math.Min(1, movieAspect / aspect);
+                float halfHeight = Math.Min(1, aspect / movieAspect);
+                if (_dualScreenMovie)
+                {
+                    DrawScreen(_topMovieBinding, _topImageBuffer, halfHeight, -halfWidth, 0, halfHeight * 2);
+                    DrawScreen(_botMovieBinding, _botImageBuffer, halfHeight, 0, halfWidth, halfHeight * 2);
+                }
+                else DrawScreen(_topMovieBinding, _topImageBuffer, halfHeight, -halfWidth, halfWidth, halfHeight * 2);
+            }
+            else
+            {
+                DrawScreen(_topMovieBinding, _topImageBuffer, y: 1);
+                DrawScreen(_botMovieBinding, _botImageBuffer, y: 0);
+            }
         }
     }
 }
@@ -466,7 +497,10 @@ namespace MphRead.Formats
         public int[] QuantizerTable { get; } = new int[3];
         private readonly VideoFrame?[] _prevVideoFrames = new VideoFrame?[3];
         private int _framesQueued = 0;
-        public int FramesQueued => _framesQueued;
+        private int _framesDecoded;
+        private int _lastConsumedFrame = -1;
+        public int FramesQueued => Volatile.Read(ref _framesQueued);
+        public bool HasImage(int frame) => frame >= 0 && frame > _lastConsumedFrame && frame < Volatile.Read(ref _framesDecoded);
         private int _audioFrameTotal = 0;
         private List<VxFrame> _vxFrames = null!;
 
@@ -484,6 +518,8 @@ namespace MphRead.Formats
         {
             _vxFrames?.Clear();
             _framesQueued = 0;
+            _framesDecoded = 0;
+            _lastConsumedFrame = -1;
             UseStaticBuffers = true;
             Array.Clear(_sampleBuffer);
         }
@@ -659,7 +695,7 @@ namespace MphRead.Formats
             }
             for (int i = 0; i < FrameCount; i++)
             {
-                while (!writeFiles && _framesQueued >= 4 && !token.IsCancellationRequested)
+                while (!writeFiles && FramesQueued >= 4 && !token.IsCancellationRequested)
                 {
                     try
                     {
@@ -696,9 +732,10 @@ namespace MphRead.Formats
                     _nextSampleBufferIndex += audioFrameCount;
                     _nextSampleBufferIndex %= SampleBufferCount;
                 }
-                _audioFrameTotal += audioFrameCount;
+                Interlocked.Add(ref _audioFrameTotal, audioFrameCount);
                 _vxFrames.Add(vxFrame);
-                _framesQueued++;
+                Volatile.Write(ref _framesDecoded, _vxFrames.Count);
+                Interlocked.Increment(ref _framesQueued);
                 _prevVideoFrames[2] = _prevVideoFrames[1];
                 _prevVideoFrames[1] = _prevVideoFrames[0];
                 _prevVideoFrames[0] = vxFrame.VideoFrame;
@@ -767,7 +804,7 @@ namespace MphRead.Formats
         // color buffer for frame being displayed
         public bool GetImage(int frameIndex, byte[] texture)
         {
-            if (_vxFrames == null || frameIndex >= _vxFrames.Count)
+            if (_vxFrames == null || !HasImage(frameIndex))
             {
                 return false;
             }
@@ -785,11 +822,12 @@ namespace MphRead.Formats
                     texture[y * 256 * 3 + x * 3 + 2] = rgb.B;
                 }
             }
-            _framesQueued--;
+            _lastConsumedFrame = frameIndex;
+            Interlocked.Decrement(ref _framesQueued);
             return true;
         }
 
-        public int AudioFrameTotal => _audioFrameTotal;
+        public int AudioFrameTotal => Volatile.Read(ref _audioFrameTotal);
 
         public ReadOnlySpan<short> GetAudioBuffer(int index)
         {

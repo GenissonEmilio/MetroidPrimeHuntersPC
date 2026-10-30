@@ -2211,7 +2211,7 @@ namespace MphRead.Entities
                 }
                 // todo?: besides the code duplication, input processing like this should work even if
                 // there's no player or the player is not active (will need to revisit this for menus)
-                if (i == 0 && player._scene.MoviePlaying)
+                if (i == 0 && player._scene.MoviePlaying && !PcRuntime.Enabled)
                 {
                     bool skipMovie = false;
                     Keybind skipControl = player.Controls.Shoot;

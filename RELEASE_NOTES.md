@@ -1,3 +1,16 @@
+# Próxima atualização — abertura e arquivos
+
+- Abertura original completa antes do título, com a marca lida da ROM.
+- Clique ou tecla no título abre três arquivos, com checkpoint e progresso reais.
+- Novo jogo reproduz prólogo, chegada e câmera da primeira sala; continuar usa
+  o arquivo escolhido sem repetir o prólogo.
+- Vídeos avançam somente quando ambos os canais foram decodificados, preservam
+  todos os quadros e só são pulados por comando explícito.
+- Menu, arquivos e configurações ficam na mesma janela; WASD, mouse, mapa e
+  diário continuam disponíveis.
+- 53 verificações sem ROM e replay de inicialização com saves isolados. Consulte
+  `docs/VALIDACAO-INICIALIZACAO.md` para resultados e limites.
+
 # Metroid Prime Hunters PC v0.2.0 — Linux e Windows x64
 
 Release principal, sem marca de pré-release, com suporte nativo a Linux x64.

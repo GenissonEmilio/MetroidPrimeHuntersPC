@@ -13,24 +13,26 @@ namespace MphRead
         private readonly Action _exit;
         private readonly Action _fullscreen;
         private readonly bool _pause;
+        private readonly Action _resetMain;
         private readonly List<PcMenuRow> _rows = new();
         private int _selected;
         private bool _settings;
         public string Status { get; set; } = "";
 
-        public PcMenu(bool pause, Action resume, Action exit, Action fullscreen, Action? practice = null, Action? map = null, Action? journal = null)
+        public bool IsSettings => _settings;
+        public PcMenu(bool pause, Action resume, Action exit, Action fullscreen, Action? practice = null, Action? map = null, Action? journal = null, Func<string>? startLabel = null)
         {
             _pause = pause; _resume = resume; _exit = exit; _fullscreen = fullscreen;
             void Main()
             {
                 _settings = false; _selected = 0; _rows.Clear();
-                Add(() => pause ? "VOLTAR AO JOGO" : "INICIAR / CONTINUAR", "Retomar a expedicao. Progresso salvo pela nave.", _ => resume());
+                Add(() => pause ? "VOLTAR AO JOGO" : startLabel?.Invoke() ?? "INICIAR / CONTINUAR", "Retomar a expedicao. Progresso salvo pela nave.", _ => resume());
                 if (!pause && practice != null)
                     Add(() => "TESTAR CONTROLES", "Arena local sem bots. Nao altera o save da campanha.", _ => practice());
                 if (pause && map != null) Add(() => "MAPA [M]", "Planta da sala, posicao e salas ja exploradas.", _ => map());
                 if (pause && journal != null) Add(() => "DIARIO [J]", "Ler os scans registrados nesta expedicao.", _ => journal());
                 Add(() => "CONFIGURACOES", "Mouse, audio e apresentacao. Alteracoes salvas localmente.", _ => Settings());
-                Add(() => pause ? "VOLTAR AO MENU" : "SAIR", pause ? "Progresso desde o ultimo save da nave pode ser perdido." : "Fechar Hunters PC.", _ => exit());
+                Add(() => pause ? "VOLTAR AO MENU" : startLabel != null ? "VOLTAR AOS ARQUIVOS" : "SAIR", pause ? "Progresso desde o ultimo save da nave pode ser perdido." : "Retornar a tela anterior.", _ => exit());
             }
             void Settings()
             {
@@ -43,11 +45,13 @@ namespace MphRead
                 Add(() => $"MUSICA      {PcRuntime.Profile.MusicVolume:P0}", "Volume independente para a musica do jogo.", d => PcRuntime.Profile.MusicVolume = Math.Clamp(PcRuntime.Profile.MusicVolume + d * 0.05f, 0, 1));
                 Add(() => "VOLTAR", "Retornar ao menu anterior.", _ => Main());
             }
-            _goBack = () => { if (_settings) Main(); else if (_pause) resume(); };
+            _resetMain = Main;
+            _goBack = () => { if (_settings) Main(); else if (_pause) resume(); else if (startLabel != null) exit(); };
             Main();
         }
 
         private readonly Action _goBack;
+        public void ResetMain() => _resetMain();
         private static string OnOff(bool value) => value ? "SIM" : "NAO";
         private void Add(Func<string> label, string detail, Action<int> action) => _rows.Add(new(label, detail, action));
         private void Activate(int direction)
@@ -75,20 +79,21 @@ namespace MphRead
             if (click) Activate(_settings && point.X < 170 ? -1 : 1);
         }
 
-        public void Draw(Vector2i size)
+        public void Draw(Vector2i size, bool backdrop = true)
         {
             using var canvas = new PcCanvas(size);
-            PcCanvas.Background(_pause);
+            if (backdrop) PcCanvas.Background(_pause);
             // Seven settings rows use the same hit boxes as the four main rows.
             for (int i = 0; i < _rows.Count; i++)
             {
                 float y = 226 + i * 58;
                 bool selected = i == _selected;
-                PcCanvas.Rect(72, y, 604, 50, selected ? new Color4(0.06f, 0.25f, 0.30f, 1) : new Color4(0.035f, 0.095f, 0.13f, 1));
+                PcCanvas.Rect(72, y, 604, 50, selected ? new Color4(0.13f, 0.23f, 0.28f, 1) : new Color4(0.07f, 0.10f, 0.14f, 1));
                 if (selected) PcCanvas.Rect(72, y, 4, 50, PcCanvas.Cyan);
                 PcCanvas.Text(94, y + 17, selected ? ">" : " ", 2, PcCanvas.Cyan);
                 PcCanvas.Text(122, y + 17, _rows[i].Label(), 2, selected ? PcCanvas.White : PcCanvas.Muted);
             }
+            if (!backdrop) return;
             PcCanvas.Text(820, 290, _settings ? "AJUSTES DE CAMPO" : "OPERADOR / SAMUS", 2, PcCanvas.Cyan);
             PcCanvas.Text(824, 324, "KEYBOARD + MOUSE", 1.6f, PcCanvas.Muted);
             PcCanvas.Text(766, 516, "WASD    MOVIMENTO", 2, PcCanvas.White);

@@ -101,8 +101,9 @@ executável. `paths.txt`, `rom-import.json`, `pc-profile.json`, `Savedata/` e
 capturas são locais e ignorados no Git. Uma instalação incompleta não é
 sobrescrita silenciosamente.
 
-A opção de aventura usa o slot 1 do formato JSON próprio do MphRead; a arena usa
-slot 0, sem save de campanha. O salvamento é o da nave, herdado da base. Sair
+A opção de aventura permite escolher os slots 1, 2 e 3 do formato JSON próprio
+do MphRead; a arena usa slot 0, sem save de campanha. A consulta dos arquivos
+no menu não cria nem regrava saves. O salvamento é o da nave, herdado da base. Sair
 da sessão pelo menu não cria um save state. Não há promessa de compatibilidade
 com saves `.sav` de DS. Não substitua os saves originais por esses arquivos.
 

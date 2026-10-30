@@ -13,7 +13,16 @@ Abra `HuntersPC.exe` na pasta extraída do pacote Windows. Se você compilou a
 versão local, o caminho padrão é `dist/HuntersPC/HuntersPC.exe`. Arraste sua ROM
 `.nds` ou seu ZIP para a janela do menu. O código-fonte e os pacotes públicos não
 incluem os dados do jogo; a importação é uma etapa local separada.
-Entre em **TESTAR CONTROLES** para a arena ou **INICIAR / CONTINUAR** para a aventura.
+Com a ROM importada, a abertura original toca completa antes da tela de título.
+Clique ou pressione uma tecla no título para abrir os três arquivos de save.
+Escolha um arquivo e entre em **NOVA AVENTURA** ou **CONTINUAR AVENTURA**.
+**TESTAR CONTROLES** abre a arena sem alterar o progresso da campanha.
+
+Um arquivo novo reproduz o prólogo, o voo de chegada e a câmera original da
+primeira sala antes de entregar o controle. Continuar usa o checkpoint do
+arquivo escolhido e não repete o prólogo de uma nova aventura. **Esc** pula a
+abertura; **Esc/Enter** pulam deliberadamente os vídeos da campanha. Cliques e
+teclas de movimento não pulam essas cenas.
 
 - **WASD** move; **mouse** mira; **clique esquerdo** dispara; **Espaço** pula.
 - **C** transforma; **E** alterna visor; **Q** faz scan/ataque alternativo.
@@ -70,6 +79,13 @@ Esse modo usa janelas OpenGL ocultas e eventos internos do jogo; não injeta ent
 no Windows nem captura o cursor. Salva capturas e `verification.json` na pasta
 indicada, e isola ali os dados de teste. Confira a
 [verificação dos painéis](docs/VALIDACAO-PAINEIS-PC.md).
+
+Para conferir abertura, título, arquivos, novo jogo e continuação, use
+`--pc-verify-startup <pasta-absoluta>`. Esse replay também usa janelas ocultas,
+isola os saves e grava `startup-verification.json`. Por padrão acelera somente
+o relógio dos vídeos do teste, sem omitir quadros. Para conferir suas durações
+originais, defina `HUNTERSPC_VERIFY_REALTIME=1` antes de executá-lo. Veja a
+[validação da inicialização](docs/VALIDACAO-INICIALIZACAO.md).
 
 O antigo fluxo de console do viewer segue acessível por `HuntersPC.exe --legacy`.
 Opções técnicas herdadas de exportação permanecem disponíveis pelo DLL com

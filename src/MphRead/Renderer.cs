@@ -2958,9 +2958,9 @@ namespace MphRead
                 _room?.CancelTransition();
                 PlatformEntity.DestroyBeams();
                 EnemyInstanceEntity.DestroyBeams();
+                StopMovieWorkers();
                 Sound.Sfx.ShutDown();
                 OutputStop();
-                _decoderCts?.Cancel();
                 Selection.Clear();
             }
         }
@@ -4903,9 +4903,9 @@ namespace MphRead
             if (PcRuntime.Enabled)
             {
                 ClientSize = new Vector2i(1280, 720);
-                VSync = PcVerification.Active ? VSyncMode.Off : VSyncMode.On;
-                if (PcVerification.Active) UpdateFrequency = 0;
-                if (PcRuntime.Profile.Fullscreen && !PcVerification.Active) WindowState = WindowState.Fullscreen;
+                VSync = PcVerification.Active || PcRuntime.AccelerateMovieVerification ? VSyncMode.Off : VSyncMode.On;
+                if (PcVerification.Active || PcRuntime.AccelerateMovieVerification) UpdateFrequency = 0;
+                if (PcRuntime.Profile.Fullscreen && !PcVerification.Active && !PcStartupVerification.Active) WindowState = WindowState.Fullscreen;
                 _pcMenu = new PcMenu(true, () => SetPcPause(false), Close, TogglePcFullscreen,
                     map: () => OpenPcArchive(PcFieldView.Map), journal: () => OpenPcArchive(PcFieldView.Journal));
             }
@@ -4967,7 +4967,8 @@ namespace MphRead
         protected override void OnRenderFrame(FrameEventArgs args)
         {
             PcVerification.BeforeFrame(this);
-            CursorState = !PcVerification.Active && IsFocused && !_pcMenuOpen && Scene.CameraMode == CameraMode.Player && !Scene.FrameAdvance && !Scene.ShowCursor && !GameState.DialogPause
+            PcStartupVerification.BeforeGameFrame(this);
+            CursorState = !PcVerification.Active && !PcStartupVerification.Active && IsFocused && !_pcMenuOpen && !Scene.MoviePlaying && Scene.ActiveCutscene == -1 && CameraSequence.Current?.BlockInput != true && Scene.CameraMode == CameraMode.Player && !Scene.FrameAdvance && !Scene.ShowCursor && !GameState.DialogPause
                 ? CursorState.Grabbed
                 : CursorState.Normal;
             GameState.ApplyPause();
@@ -4984,16 +4985,18 @@ namespace MphRead
             if (PcView == PcFieldView.Map) PcMap?.Draw(ClientSize);
             else if (PcView == PcFieldView.Journal) PcJournal?.Draw(ClientSize);
             else if (_pcMenuOpen) _pcMenu?.Draw(ClientSize);
-            else if (PcRuntime.Enabled && PcRuntime.Profile.ShowHints && !GameState.DialogPause && !Scene.MoviePlaying)
+            else if (PcRuntime.Enabled && Scene.MoviePlaying) PcStartupArt.SkipHint(ClientSize);
+            else if (PcRuntime.Enabled && PcRuntime.Profile.ShowHints && !GameState.DialogPause && !Scene.MoviePlaying && Scene.ActiveCutscene == -1 && CameraSequence.Current?.BlockInput != true)
             {
                 PcHud.Draw(ClientSize);
             }
             if (_pcCapture) { PcCapture.Save(ClientSize); _pcCapture = false; }
             PcVerification.AfterFrame(this);
+            PcStartupVerification.AfterGameFrame(this);
             SwapBuffers();
             if (_startedHidden)
             {
-                if (!PcVerification.Active) IsVisible = true;
+                if (!PcVerification.Active && !PcStartupVerification.Active) IsVisible = true;
                 _startedHidden = false;
             }
             if (!_pcMenuOpen) Scene.AfterRenderFrame();
@@ -5011,6 +5014,7 @@ namespace MphRead
 
         protected override void OnMouseDown(MouseButtonEventArgs e)
         {
+            if (PcRuntime.Enabled && Scene.MoviePlaying) return;
             if (_pcMenuOpen)
             {
                 if (e.Button == MouseButton.Left) HandlePcPointer(MouseState.Position, true);
@@ -5035,6 +5039,7 @@ namespace MphRead
 
         protected override void OnMouseMove(MouseMoveEventArgs e)
         {
+            if (PcRuntime.Enabled && Scene.MoviePlaying) return;
             if (_pcMenuOpen)
             {
                 HandlePcPointer(MouseState.Position, false);
@@ -5046,6 +5051,7 @@ namespace MphRead
 
         protected override void OnMouseWheel(MouseWheelEventArgs e)
         {
+            if (PcRuntime.Enabled && Scene.MoviePlaying) return;
             if (_pcMenuOpen) { HandlePcPointer(MouseState.Position, false, e.OffsetY); return; }
             Scene.OnMouseWheel(e.OffsetY);
             base.OnMouseWheel(e);
@@ -5081,7 +5087,7 @@ namespace MphRead
 
         protected override void OnFocusedChanged(FocusedChangedEventArgs e)
         {
-            if (PcRuntime.Enabled && !PcVerification.Active && !e.IsFocused && !_startedHidden && !_pcMenuOpen) SetPcPause(true);
+            if (PcRuntime.Enabled && !PcVerification.Active && !PcStartupVerification.Active && !e.IsFocused && !_startedHidden && !_pcMenuOpen) SetPcPause(true);
             base.OnFocusedChanged(e);
         }
 
@@ -5100,6 +5106,11 @@ namespace MphRead
         internal void HandlePcKey(Keys key)
         {
             if (key == Keys.F12) { _pcCapture = true; return; }
+            if (Scene.MoviePlaying)
+            {
+                if (key is Keys.Escape or Keys.Enter) Scene.SkipMovie();
+                return;
+            }
             if (key == Keys.M) { if (PcView == PcFieldView.Map) ClosePcArchive(); else OpenPcArchive(PcFieldView.Map); return; }
             if (key == Keys.J) { if (PcView == PcFieldView.Journal) ClosePcArchive(); else OpenPcArchive(PcFieldView.Journal); return; }
             if (key == Keys.Tab && PcView is PcFieldView.Map or PcFieldView.Journal)

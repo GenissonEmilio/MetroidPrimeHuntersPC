@@ -47,7 +47,9 @@ ambas identificadas por tamanho, cabeçalho e SHA-256. Importe sua própria ROM 
 ```
 
 ZIP com uma ROM também é aceito. Arquivos 7z devem ser extraídos antes.
-Use **TESTAR CONTROLES** para a arena e **INICIAR / CONTINUAR** para a campanha.
+Após a abertura e o título, clique ou pressione uma tecla, escolha um dos três
+arquivos e entre em **NOVA AVENTURA** ou **CONTINUAR AVENTURA**.
+**TESTAR CONTROLES** abre a arena sem alterar a campanha.
 Os controles são os mesmos de Windows; consulte `README-PC.md`.
 
 ## Dados, saves e atualizações
@@ -79,3 +81,8 @@ backends de áudio sem ROM, em janela oculta e sem capturar entrada do desktop.
 Após importar a ROM, `--pc-verify "$PWD/evidence/linux-gameplay"` verifica arena,
 primeira sala, controles, Morph Ball, mapa e diário. Perfis e saves de teste
 ficam isolados na pasta de evidências. Isso não certifica a campanha completa.
+
+`--pc-verify-startup "$PWD/evidence/startup"` confere abertura, título, arquivos,
+prólogo e continuação com saves isolados. Use `HUNTERSPC_VERIFY_REALTIME=1` para
+reproduzir os vídeos nas durações originais durante esse teste. Consulte
+[a validação da inicialização](docs/VALIDACAO-INICIALIZACAO.md).

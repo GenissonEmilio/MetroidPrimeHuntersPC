@@ -105,6 +105,56 @@ try
     var emptyView = new PcMapView(new PcMapGeometry(Array.Empty<PcMapPolygon>()));
     Check(float.IsFinite(emptyView.Scale), "Empty map geometry does not divide by zero");
     Check(Metadata.GetRoomById(-1, noThrow: true) == null, "An empty campaign checkpoint safely falls back to the first room");
+    var startup = new PcStartupFlow(opening: true);
+    startup.PressTitle();
+    Check(startup.Page == PcStartupPage.Opening, "A launch input cannot bypass the opening into a campaign");
+    startup.FinishOpening(); startup.PressTitle();
+    Check(startup.Page == PcStartupPage.Files && startup.SaveSlot == 0, "Title input opens files without selecting or starting a save");
+    startup.SelectFile(3);
+    Check(startup.Page == PcStartupPage.Menu && startup.SaveSlot == 3, "File selection carries slot 3 into the adventure menu");
+    startup.Back(); startup.Back();
+    Check(startup.Page == PcStartupPage.Title, "Back navigation returns from the menu through files to title");
+    bool invalidSlot = false;
+    try { startup.SelectFile(0); } catch (ArgumentOutOfRangeException) { invalidSlot = true; }
+    Check(invalidSlot, "Practice slot zero is never a selectable campaign file");
+    var movieClock = new MoviePlaybackClock(4, 15);
+    Check(movieClock.Step(0.01, true) == MovieClockStep.Wait, "A movie holds its first frame for its encoded duration");
+    Check(movieClock.Step(2, false) == MovieClockStep.Wait && movieClock.FrameIndex == 0, "A late decoder cannot advance or finish a movie");
+    int framesShown = 1;
+    double movieTime = 2;
+    while (true)
+    {
+        var step = movieClock.Step(movieTime, true);
+        if (step == MovieClockStep.Complete) break;
+        if (step == MovieClockStep.Advance) framesShown++;
+        movieTime += movieClock.FrameDuration;
+    }
+    Check(framesShown == 4 && movieClock.FrameIndex == 3, "Every frame, including the last one, is presented before completion");
+    foreach (var size in new[] { new Vector2i(1280,720), new Vector2i(1024,768), new Vector2i(2560,1080) })
+    {
+        float scale = Math.Min(size.X / 1280f, size.Y / 720f);
+        Vector2 filePoint = new Vector2(400, 505) * scale + new Vector2((size.X - 1280 * scale) / 2, (size.Y - 720 * scale) / 2);
+        Check(PcStartupLayout.HitFile(PcLayout.ToCanvas(filePoint, size)) == 2, $"Original-style slot 3 remains clickable at {size}");
+    }
+    Check(PcStartupLayout.HitFile(new(400, 329)) == -1, "The gap between save cards never selects another file");
+    Check(!PcSaveCatalog.Read(folder, 1).Exists && !Directory.Exists(Path.Combine(folder,"Savedata")), "Inspecting an empty file list creates no saves");
+    string saves = Path.Combine(folder,"Savedata"); Directory.CreateDirectory(saves);
+    string corruptPath = PcSaveCatalog.PathFor(folder, 2);
+    string fixturePath = PcSaveCatalog.PathFor(folder, 3);
+    try
+    {
+        File.WriteAllText(corruptPath,"{broken");
+        Check(PcSaveCatalog.Read(folder, 2).Damaged && File.ReadAllText(corruptPath) == "{broken", "Unreadable save files are identified and preserved");
+        File.WriteAllText(fixturePath, System.Text.Json.JsonSerializer.Serialize(new {
+            RoomState=Enumerable.Range(0,66).Select(_=>new int[60]).ToArray(), VisitedRooms=new int[9], Logbook=new int[68],
+            Ammo=new int[2], AmmoMax=new int[2], WeaponSlots=new int[3], CheckpointRoomId=45, FoundOctoliths=5, ScanCount=24
+        }));
+        string beforeSave = File.ReadAllText(fixturePath);
+        var slot = PcSaveCatalog.Read(folder,3);
+        Check(slot.HasProgress && slot.RoomId == 45 && slot.Octoliths == 2 && slot.Scans == 24, "File cards display the selected file's actual progress");
+        Check(File.ReadAllText(fixturePath) == beforeSave && !File.Exists(PcSaveCatalog.PathFor(folder,1)), "Reading slot 3 never rewrites it or creates slot 1");
+    }
+    finally { if(File.Exists(corruptPath))File.Delete(corruptPath);if(File.Exists(fixturePath))File.Delete(fixturePath);Directory.Delete(saves); }
     Console.WriteLine($"{checks} checks passed.");
 }
 finally

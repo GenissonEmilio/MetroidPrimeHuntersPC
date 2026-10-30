@@ -20,7 +20,8 @@ METROID PRIME HUNTERS PC - WINDOWS X64
 
 1. Extraia a pasta inteira e abra HuntersPC.exe.
 2. Arraste sua ROM USA revisao 0 ou Europa revisao 1 (.nds ou ZIP com uma ROM) para o menu.
-3. Aguarde a importacao local e escolha TESTAR CONTROLES ou INICIAR / CONTINUAR.
+3. Apos a abertura, clique ou pressione uma tecla no titulo e escolha um arquivo.
+4. Use NOVA AVENTURA / CONTINUAR AVENTURA ou TESTAR CONTROLES para a arena.
 
 WASD: mover. Mouse: camera/mira. Clique: disparar. Espaco: pular/boost.
 C: alternar forma. E: visor. Q: scan/ataque alternativo. Roda/1-9: armas.

@@ -14,12 +14,14 @@ namespace MphRead
         public bool Fullscreen { get; set; }
         public float SoundVolume { get; set; } = 0.35f;
         public float MusicVolume { get; set; } = 0.5f;
+        public byte LastSaveSlot { get; set; } = 1;
 
         public void Validate()
         {
             MouseSensitivity = Single.IsFinite(MouseSensitivity) ? Math.Clamp(MouseSensitivity, 0.1f, 4) : 1;
             SoundVolume = Single.IsFinite(SoundVolume) ? Math.Clamp(SoundVolume, 0, 1) : 0.35f;
             MusicVolume = Single.IsFinite(MusicVolume) ? Math.Clamp(MusicVolume, 0, 1) : 0.5f;
+            if (LastSaveSlot is < 1 or > 3) LastSaveSlot = 1;
         }
 
         public static PcProfile Load(string path)
@@ -54,6 +56,8 @@ namespace MphRead
         public static string StateRoot { get; set; } = PcStorage.DataDirectory;
         public static string ProfilePath => Path.Combine(StateRoot, "pc-profile.json");
         internal static PcReplayInput? Replay { get; set; }
+        internal static bool AccelerateMovieVerification { get; set; }
+        internal static Action<Movie, int, int, bool>? MovieEnded { get; set; }
 
         public static void Apply()
         {

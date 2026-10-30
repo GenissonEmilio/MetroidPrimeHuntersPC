@@ -23,7 +23,8 @@ Versão Linux com gameplay e interface em uma única tela.
 1. Baixe o ZIP **Windows x64** na página de releases e extraia a pasta inteira.
 2. Abra `HuntersPC.exe`. O runtime .NET e as bibliotecas de áudio já acompanham o pacote.
 3. Arraste sua própria ROM **USA revisão 0 ou Europa revisão 1**, `.nds` ou ZIP com uma única ROM, para o menu.
-4. Escolha **TESTAR CONTROLES** para uma arena local ou **INICIAR / CONTINUAR** para a aventura.
+4. Após a abertura, clique ou pressione uma tecla no título. Escolha um dos três
+   arquivos e entre em **NOVA AVENTURA** ou **CONTINUAR AVENTURA**. **TESTAR CONTROLES** abre a arena local.
 
 Requer Windows 10/11 de 64 bits e suporte a OpenGL 3.2. Não é necessário instalar
 o .NET para jogar. Não há ROM, BIOS, saves ou dados extraídos do jogo neste repositório
@@ -56,6 +57,12 @@ sala, posição/direção, portas e salas já visitadas, com zoom e seleção de
 O diário lista somente registros desbloqueados no save e usa os textos da ROM.
 
 ## Estado da versão
+
+O código atual acrescenta abertura completa, título com a marca original,
+seleção de três arquivos e prólogo de uma nova aventura, adaptados à mesma
+janela. A arte e os vídeos são lidos da ROM importada. São 53 verificações
+unitárias; os testes de inicialização e seus limites estão em
+[Validação da inicialização](docs/VALIDACAO-INICIALIZACAO.md).
 
 **v0.2.0 — release principal, com Linux x64.** A base de jogo continua em
 desenvolvimento. Foram verificados a arena Combat Hall, a primeira sala

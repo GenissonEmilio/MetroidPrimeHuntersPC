@@ -1,10 +1,10 @@
 """Publish audited CI packages together, without rebuilding or accessing game data."""
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import tarfile
 import zipfile
@@ -21,6 +21,13 @@ def unique(folder, pattern):
     if len(matches) != 1:
         raise ValueError(f'Expected exactly one {pattern}, found {len(matches)}')
     return matches[0]
+
+
+def find_release(repo, version):
+    # The tag endpoint only returns published releases. Drafts must be found
+    # through the authenticated release list, then accessed by numeric ID.
+    releases = json.loads(gh('api', f'repos/{repo}/releases?per_page=100'))
+    return next((release for release in releases if release['tag_name'] == version), None)
 
 
 def publish():
@@ -81,18 +88,29 @@ def publish():
     notes_file = stage / 'release-notes.md'
     notes_file.write_text(notes)
     title = f'Metroid Prime Hunters PC {version} - abertura completa e graficos melhorados'
-    gh('release', 'create', version, '--repo', repo, '--verify-tag', '--draft', '--title', title,
-       '--notes-file', str(notes_file), *map(str, assets))
-    release = json.loads(gh('api', f'repos/{repo}/releases/tags/{version}'))
+    release = find_release(repo, version)
+    if release is None:
+        gh('release', 'create', version, '--repo', repo, '--verify-tag', '--draft', '--title', title,
+           '--notes-file', str(notes_file), *map(str, assets))
+        release = find_release(repo, version)
+    if release is None or not release['draft']:
+        raise ValueError('Expected an unpublished draft; existing releases are preserved')
     actual = {a['name']: a for a in release['assets']}
-    if not release['draft'] or set(actual) != {p.name for p in assets}:
+    expected = {p.name for p in assets}
+    if set(actual) - expected:
         raise ValueError('Draft release asset list mismatch')
+    missing = [asset for asset in assets if asset.name not in actual]
+    if missing:
+        gh('release', 'upload', version, '--repo', repo, *map(str, missing))
+        release = json.loads(gh('api', f"repos/{repo}/releases/{release['id']}"))
+        actual = {a['name']: a for a in release['assets']}
+    if set(actual) != expected:
+        raise ValueError('Draft release is incomplete')
     for asset in assets:
-        import hashlib
         digest = hashlib.sha256(asset.read_bytes()).hexdigest()
         if actual[asset.name]['size'] != asset.stat().st_size or actual[asset.name].get('digest') != 'sha256:' + digest:
             raise ValueError('Uploaded asset digest mismatch: ' + asset.name)
-    gh('release', 'edit', version, '--repo', repo, '--draft=false', '--latest')
+    gh('api', '--method', 'PATCH', f"repos/{repo}/releases/{release['id']}", '-F', 'draft=false', '-f', 'make_latest=true')
     print(gh('release', 'view', version, '--repo', repo, '--json', 'url,isDraft,isPrerelease,assets'))
 
 

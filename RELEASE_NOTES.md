@@ -1,76 +1,84 @@
-# Próxima atualização — abertura e arquivos
+# Metroid Prime Hunters PC v0.3.0 — abertura completa e gráficos melhorados
 
-- Correção do viewport das cutscenes ao mudar para tela cheia, redimensionar ou
-  usar escala de DPI diferente; o desenho acompanha os pixels do framebuffer.
-- Gráficos melhorados por padrão: mipmaps, trilinear, anisotropia até 16× e
-  suavização de bordas na cena 3D. Configurações permitem voltar ao visual original.
-- Vídeos ampliados com filtragem linear, mantendo a proporção original.
-- Abertura original completa antes do título, com a marca lida da ROM.
-- Clique ou tecla no título abre três arquivos, com checkpoint e progresso reais.
-- Novo jogo reproduz prólogo, chegada e câmera da primeira sala; continuar usa
-  o arquivo escolhido sem repetir o prólogo.
-- Vídeos avançam somente quando ambos os canais foram decodificados, preservam
-  todos os quadros e só são pulados por comando explícito.
-- Menu, arquivos e configurações ficam na mesma janela; WASD, mouse, mapa e
-  diário continuam disponíveis.
-- 57 verificações sem ROM e replay de inicialização com saves isolados. Consulte
-  `docs/VALIDACAO-INICIALIZACAO.md` para resultados e limites.
+Nova versão para **Windows e Linux x64**, baseada em MphRead, de NoneGiven.
+Corrige o enquadramento das cutscenes em tela cheia e acrescenta a abertura,
+o fluxo de título/arquivos e filtros gráficos ligados por padrão.
 
-# Metroid Prime Hunters PC v0.2.0 — Linux e Windows x64
+## Downloads e instalação
 
-Release principal, sem marca de pré-release, com suporte nativo a Linux x64.
-Baseada em MphRead, de NoneGiven. O estado experimental da recriação do jogo e
-os limites de campanha continuam descritos abaixo.
+- **Windows:** `MetroidPrimeHuntersPC-v0.3.0-windows-x64.zip`. Extraia a pasta
+  inteira e abra `HuntersPC.exe`. Requer Windows 10/11 x64 e OpenGL 3.2.
+- **Linux:** `MetroidPrimeHuntersPC-v0.3.0-linux-x64.tar.gz`. Extraia e execute
+  `./install.sh` dentro de `HuntersPC/`. Abra pelo menu de aplicativos ou pelo
+  comando `hunters-pc`. Consulte o [guia Linux](https://github.com/GenissonEmilio/MetroidPrimeHuntersPC/blob/v0.3.0/README-LINUX.md)
+  para dependências de OpenAL, X11/XWayland e drivers OpenGL.
 
-## Downloads
-
-- **Linux:** `MetroidPrimeHuntersPC-v0.2.0-linux-x64.tar.gz`. Extraia e execute
-  `./install.sh` em `HuntersPC/`. Abra **Metroid Prime Hunters PC** no menu de
-  aplicativos ou execute `~/.local/bin/hunters-pc`. Consulte `README-LINUX.md`
-  para dependências de OpenAL/X11 e drivers OpenGL.
-- **Windows:** `MetroidPrimeHuntersPC-v0.2.0-windows-x64.zip`. Extraia a pasta
-  inteira e abra `HuntersPC.exe`.
-
-Os dois pacotes incluem o runtime .NET 10; não exigem SDK para jogar.
+Os dois pacotes incluem o runtime .NET 10 e não exigem SDK para jogar.
 Importe sua própria ROM **USA revisão 0** ou **Europa revisão 1**, `.nds` ou ZIP
-com uma ROM. Extraia arquivos 7z antes de importar. Cada revisão é validada por
-tamanho, identificação e SHA-256. Nenhuma ROM, BIOS, save, perfil pessoal ou
-dado extraído do jogo acompanha os downloads.
+com uma única ROM. Não há ROM, BIOS, save, perfil pessoal ou dados extraídos
+do jogo nos downloads. As auditorias e os checksums SHA-256 acompanham a release.
 
 ## Novidades
 
-- Linux x64 com renderização OpenGL 3.2 em X11/XWayland, GLFW e MiniAudio.
-- Instalador por usuário, comando `hunters-pc`, ícone e entrada no menu de aplicativos.
-- No Linux, dados ficam em `${XDG_DATA_HOME:-$HOME/.local/share}/hunterspc`,
-  separados dos binários. Atualizar o programa preserva a importação e os saves.
-- `HUNTERSPC_DATA_DIR` permite escolher outra pasta de dados e isolar testes.
-- Importação da ROM Europa revisão 1, além da USA revisão 0 já aceita.
-- Correção do estado OpenGL ao abrir mapa, diário e pausa: o shader e framebuffer
-  da cena são restaurados mesmo quando a simulação está pausada.
-- Compilação, auditoria de tarball e verificação de menu/áudio no CI Linux.
-- Manifesto com hashes por arquivo, auditoria contra dados pessoais e checksum do download.
+- **Cutscenes em tela cheia:** viewport, tamanho da cena e framebuffer agora
+  acompanham a resolução física, inclusive após redimensionar ou mudar de DPI.
+  Corrige a imagem deslocada e a moldura branca; preserva proporções e barras
+  pretas dos filmes.
+- **Gráficos melhorados por padrão:** texturas com mipmaps, filtragem trilinear,
+  anisotropia até 16× conforme a GPU e suavização de bordas na cena 3D. Vídeos
+  ampliados usam filtragem linear; textos e atlas do HUD permanecem nítidos.
+  **Configurações → Gráficos** permite alternar para o visual original e salva
+  a preferência. São filtros sobre as texturas originais, sem pacote de texturas HD.
+- **Abertura completa:** todos os 1.243 quadros são reproduzidos antes do título.
+  O decoder espera os dois canais e encerra somente após o último quadro.
+- **Título e três arquivos:** clique ou tecla no título abre a seleção de saves,
+  com checkpoint, octolitos e scans reais. Consultar os arquivos não cria nem
+  regrava a campanha. Saves ilegíveis são identificados e preservados.
+- **Nova aventura:** reproduz prólogo, pouso e câmera de chegada à primeira sala.
+  Continuar usa o arquivo escolhido sem repetir o prólogo. Para rever tudo desde
+  o começo, escolha um arquivo vazio. Esc pula a abertura; Esc/Enter pulam vídeos
+  da campanha. Cliques de lançamento e teclas de movimento não pulam as cenas.
+- Menu, configurações, HUD, mapa local e diário continuam em uma única janela,
+  com WASD, câmera no mouse e atalhos M/J. F12 captura a resolução física completa.
 
-WASD, mira no mouse, HUD em uma tela, configurações, mapa local e diário seguem
-disponíveis. M/J abrem os painéis, Tab alterna, Esc volta ou pausa.
+Nos filmes com imagens complementares nas duas telas de DS, os canais ficam
+lado a lado numa composição cinematográfica, sem moldura de console. Os vídeos
+de um canal ficam centralizados. Gameplay e menus usam uma única tela.
+
+## Atualizar preservando o progresso
+
+No Linux, execute o instalador do novo pacote; os dados em
+`${XDG_DATA_HOME:-$HOME/.local/share}/hunterspc` ficam separados dos binários.
+
+No Windows, extraia em uma pasta nova. Copie `Savedata/` e `pc-profile.json`
+da instalação anterior para manter progresso e ajustes, e reimporte a mesma ROM
+na nova pasta. Guarde a instalação anterior até conferir seus arquivos.
+Os saves continuam no formato JSON do MphRead.
 
 ## Validação e limites
 
-37 verificações unitárias, 11 testes de empacotamento/instalação e 54 verificações
-de gameplay no Linux, com 21 capturas em arena e primeira sala da aventura.
-Menu, configurações, redimensionamento e inicialização dos dois backends de áudio
-também foram conferidos sem ROM. O replay usa janelas ocultas e não captura o
-cursor nem injeta eventos no desktop. A verificação local usa Fedora 44,
-Intel/Mesa e a ROM Europa revisão 1; o CI Linux usa Ubuntu 22.04/Mesa.
+- 57 checks sem ROM e 11 testes de empacotamento/instalação.
+- No Windows, 53 verificações de inicialização/gráficos, 54 de gameplay/HUD/mapa/
+  diário e 6 de smoke de menu/áudio/shader passaram em janelas ocultas.
+- Foram conferidos viewport e pixels dos cantos em 1920×1080, 2560×1080 e
+  1024×768, incluindo a reprodução de um viewport deslocado. O sampler real
+  da Intel Iris Xe confirmou anisotropia 16×, mipmaps e filtros ativos.
+- Os dois pacotes são compilados e auditados no CI. O Linux também executa o
+  menu, os backends de áudio e a compilação/link do shader no Mesa, sem ROM.
 
-Isso não certifica campanha completa, todos os saves, todas as salas, outras
-GPUs ou multiplayer online. O mapa é uma planta local por sala, sem composição
-3D regional original do DS. Os textos do diário seguem o idioma da ROM.
-Os avisos NU1902/NU1903 da dependência ImageSharp herdada continuam registrados
-em `docs/ANALISE-PORT-PC.md`; não foram suprimidos. O executável Windows não tem
-assinatura Authenticode. Saves usam o JSON do MphRead, sem garantia de
-compatibilidade com saves de DS.
+Isso não certifica toda a campanha, todos os checkpoints, outras GPUs ou
+multiplayer online. A interface de título/arquivos é uma adaptação para PC;
+não inclui todos os efeitos do menu de DS nem copiar/apagar arquivos. O mapa
+continua sendo uma planta local por sala; o diário usa o idioma da ROM.
+Os avisos herdados de dependências continuam documentados, sem supressão.
+O executável Windows não possui assinatura Authenticode.
+
+Detalhes: [gráficos](https://github.com/GenissonEmilio/MetroidPrimeHuntersPC/blob/v0.3.0/docs/VALIDACAO-GRAFICOS.md),
+[inicialização](https://github.com/GenissonEmilio/MetroidPrimeHuntersPC/blob/v0.3.0/docs/VALIDACAO-INICIALIZACAO.md)
+e [painéis](https://github.com/GenissonEmilio/MetroidPrimeHuntersPC/blob/v0.3.0/docs/VALIDACAO-PAINEIS-PC.md).
 
 ## Créditos
 
 MphRead / NoneGiven, MIT. Modificações de PC e interface: GenissonEmilio.
-Licenças e avisos das bibliotecas acompanham os pacotes em `licenses/`.
+Histórico, créditos e licença foram preservados. Licenças das bibliotecas
+acompanham os pacotes em `licenses/`. Projeto não afiliado à Nintendo.

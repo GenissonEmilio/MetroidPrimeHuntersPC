@@ -69,12 +69,14 @@ Gráficos melhorados vêm ligados: mipmaps, filtragem trilinear, anisotropia at�
 16× e suavização de bordas, ajustáveis nas configurações. Veja
 [Validação dos gráficos](docs/VALIDACAO-GRAFICOS.md).
 
-**v0.2.0 — release principal, com Linux x64.** A base de jogo continua em
-desenvolvimento. Foram verificados a arena Combat Hall, a primeira sala
-da aventura, HUD normal/Morph Ball e os fluxos de mapa/diário, com 37 verificações
-unitárias, 11 testes de empacotamento/instalação e 54 no runtime real do Linux. Isso não certifica campanha completa, todos os
-saves, todas as salas ou multiplayer online. O mapa é uma planta local por sala,
-e não a composição 3D regional original do DS. Leia as limitações da release.
+**v0.3.0 — abertura completa, seleção de arquivos e gráficos melhorados para
+Windows/Linux x64.** Foram verificados título e saves, a arena Combat Hall,
+a primeira sala da aventura, HUD normal/Morph Ball, mapa e diário. São 57
+checks sem ROM, 11 testes de empacotamento/instalação, 53 verificações de
+inicialização e gráficos e 54 de gameplay no Windows. O CI Linux confere o
+pacote, menu, áudio e shader no Mesa. Isso não certifica campanha completa,
+todas as salas, todos os checkpoints ou multiplayer online. O mapa continua
+sendo uma planta local por sala. Leia as limitações da release.
 
 No Linux, execute o instalador da nova versão; os dados ficam separados.
 No Windows, para atualizar, extraia o ZIP em uma pasta nova e copie, se quiser manter a

@@ -36,13 +36,13 @@ jobs:
       - name: Check packaged menu and audio on Mesa
         run: |
           mkdir -p local/package-test
-          tar -xzf artifacts/v0.2.0/*-linux-x64.tar.gz -C local/package-test
+          tar -xzf artifacts/v0.3.0/*-linux-x64.tar.gz -C local/package-test
           xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 ALSOFT_DRIVERS=null HUNTERSPC_DATA_DIR="$PWD/local/test-data" \
             ./local/package-test/HuntersPC/HuntersPC.sh --pc-smoke "$PWD/evidence/linux-smoke"
       - uses: actions/upload-artifact@v7
         with:
           name: HuntersPC-linux-x64
           path: |
-            artifacts/v0.2.0/*
+            artifacts/v0.3.0/*
             evidence/linux-smoke/*
           if-no-files-found: error

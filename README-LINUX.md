@@ -1,6 +1,6 @@
 # Hunters PC para Linux x64
 
-Baixe `MetroidPrimeHuntersPC-v0.2.0-linux-x64.tar.gz` na página de releases.
+Baixe `MetroidPrimeHuntersPC-v0.3.0-linux-x64.tar.gz` na página de releases.
 O pacote inclui .NET 10, GLFW e MiniAudio. Requer Linux x86-64 com glibc 2.27+
 e OpenGL 3.2 com perfil de compatibilidade. Usa X11 ou XWayland em sessões Wayland.
 OpenAL Soft e as bibliotecas do sistema devem estar instaladas.
@@ -27,7 +27,7 @@ Não é necessário instalar .NET ou SDK para jogar.
 ## Instalar e iniciar
 
 ```bash
-tar -xzf MetroidPrimeHuntersPC-v0.2.0-linux-x64.tar.gz
+tar -xzf MetroidPrimeHuntersPC-v0.3.0-linux-x64.tar.gz
 cd HuntersPC
 ./install.sh
 ```
@@ -73,7 +73,7 @@ dotnet run --project tests/PcChecks/PcChecks.csproj -c Release
 python3 -m unittest discover -s tests -p 'test_*package.py'
 ./scripts/build-linux.sh
 ./dist/HuntersPC-linux-x64/HuntersPC.sh --pc-smoke "$PWD/evidence/linux-smoke"
-python3 scripts/package-linux.py --version v0.2.0
+python3 scripts/package-linux.py --version v0.3.0
 ```
 
 `--pc-smoke` verifica menu OpenGL, configurações, redimensionamento e os dois

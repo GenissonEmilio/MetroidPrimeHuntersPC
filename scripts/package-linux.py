@@ -45,5 +45,5 @@ def package(version):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", default="v0.2.0")
+    parser.add_argument("--version", default="v0.3.0")
     package(parser.parse_args().version)

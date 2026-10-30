@@ -1,0 +1,48 @@
+name: Publish verified release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release tag (vMAJOR.MINOR.PATCH)
+        required: true
+        default: v0.3.0
+      source_commit:
+        description: Full commit SHA used by both builds and the release tag
+        required: true
+      windows_run:
+        description: Successful Windows build run ID
+        required: true
+      linux_run:
+        description: Successful Linux build run ID
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Verify artifacts and publish complete release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_COMMIT: ${{ inputs.source_commit }}
+          WINDOWS_RUN: ${{ inputs.windows_run }}
+          LINUX_RUN: ${{ inputs.linux_run }}
+        run: python3 scripts/publish-release.py
